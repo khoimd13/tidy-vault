@@ -7,7 +7,12 @@ import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '.
 import * as store from '../../store/db';
 import { buildCleanupList } from '../../suggest/cleanupList';
 import { buildSuggestions, groupSuggestions } from '../../suggest/suggestions';
-import { fetchThumbsViaTab, findPhotosTabId, sendToTab } from '../lib/chromeApi';
+import {
+  fetchThumbsViaTab,
+  findPhotosTabId,
+  injectContentScript,
+  sendToTab,
+} from '../lib/chromeApi';
 import { clearThumbCache } from './components/Thumb';
 import { useAnalysis } from './useAnalysis';
 
@@ -34,6 +39,8 @@ export function useVault() {
   const [items, setItems] = useState<PhotoItem[]>([]);
   const [decisions, setDecisions] = useState<Map<string, Decision>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  /** Bumped on every successful ping, so work that stopped while disconnected starts again. */
+  const [connection, setConnection] = useState(0);
 
   const addItems = useCallback((next: PhotoItem[]) => {
     if (next.length === 0) return;
@@ -94,13 +101,28 @@ export function useVault() {
   const command = useCallback(
     async (type: Exclude<PanelToContent['type'], 'thumbs/fetch'>) => {
       if (tabId === null) return;
-      try {
+      const send = async () => {
         const res = await sendToTab(tabId, { type });
+        if (!res || typeof res.state !== 'string') throw new Error('The page sent no reply');
+        return res;
+      };
+      try {
+        let res;
+        try {
+          res = await send();
+        } catch {
+          // Vault Tidy's page script isn't there (e.g. the tab was open before the extension was
+          // installed or reloaded): put it in now and try once more.
+          await injectContentScript(tabId);
+          res = await send();
+        }
         setScan({ state: res.state, seen: res.seen });
         if (res.items) addItems(res.items);
+        if (type === 'ping') setConnection((n) => n + 1);
         setError(null);
-      } catch {
-        setError(NOT_CONNECTED);
+      } catch (err) {
+        console.warn('Vault Tidy: cannot reach the Google Photos tab', err);
+        setError(`${NOT_CONNECTED} (${err instanceof Error ? err.message : String(err)})`);
       }
     },
     [tabId, addItems],
@@ -117,8 +139,11 @@ export function useVault() {
 
   // Thumbnails can only be downloaded through a connected Google Photos tab.
   const fetchThumbs = useMemo(
-    () => (tabId === null ? null : (urls: string[]) => fetchThumbsViaTab(tabId, urls)),
-    [tabId],
+    () =>
+      tabId === null || connection === 0
+        ? null
+        : (urls: string[]) => fetchThumbsViaTab(tabId, urls),
+    [tabId, connection],
   );
   const ai = useAnalysis(items, fetchThumbs);
 

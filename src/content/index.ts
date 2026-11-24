@@ -4,6 +4,11 @@ import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
 import { isPanelToContent, type ContentToPanel, type PanelResponse } from '../shared/messages';
 import type { PhotoItem } from '../shared/types';
 
+/** The panel may inject this script again into a tab that already has it; run only once. */
+const loadedFlag = '__vaultTidyLoaded';
+const alreadyLoaded = (globalThis as Record<string, unknown>)[loadedFlag] === true;
+(globalThis as Record<string, unknown>)[loadedFlag] = true;
+
 let scanner: Scanner | null = null;
 /** Everything found on this page, so a panel that was closed mid-scan can catch up on `ping`. */
 const found = new Map<string, PhotoItem>();
@@ -44,27 +49,28 @@ function status(): PanelResponse {
   return { ok: true, state: scanner?.status ?? 'idle', seen: scanner?.seenCount ?? 0 };
 }
 
-chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
-  if (!isPanelToContent(msg)) return;
-  if (msg.type === 'thumbs/fetch') {
-    void fetchThumbnails(msg.urls).then((thumbs) => sendResponse({ ...status(), thumbs }));
-    return true; // keeps the message channel open for the async reply
-  }
-  switch (msg.type) {
-    case 'ping':
-      break;
-    case 'scan/start':
-      start();
-      break;
-    case 'scan/pause':
-      scanner?.pause();
-      break;
-    case 'scan/resume':
-      scanner?.resume();
-      break;
-    case 'scan/cancel':
-      scanner?.cancel();
-      break;
-  }
-  sendResponse({ ...status(), ...(msg.type === 'ping' ? { items: [...found.values()] } : {}) });
-});
+if (!alreadyLoaded)
+  chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
+    if (!isPanelToContent(msg)) return;
+    if (msg.type === 'thumbs/fetch') {
+      void fetchThumbnails(msg.urls).then((thumbs) => sendResponse({ ...status(), thumbs }));
+      return true; // keeps the message channel open for the async reply
+    }
+    switch (msg.type) {
+      case 'ping':
+        break;
+      case 'scan/start':
+        start();
+        break;
+      case 'scan/pause':
+        scanner?.pause();
+        break;
+      case 'scan/resume':
+        scanner?.resume();
+        break;
+      case 'scan/cancel':
+        scanner?.cancel();
+        break;
+    }
+    sendResponse({ ...status(), ...(msg.type === 'ping' ? { items: [...found.values()] } : {}) });
+  });

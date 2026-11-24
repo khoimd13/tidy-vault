@@ -18,7 +18,8 @@ export default defineManifest({
   ],
   // Keep this list minimal. Thumbnails are downloaded by the content script inside the Google
   // Photos tab (they need the Google session), so no image-server permission is needed.
-  permissions: ['sidePanel', 'storage'],
+  // scripting: re-inject the page script into a Google Photos tab that was open before a reload.
+  permissions: ['sidePanel', 'storage', 'scripting'],
   host_permissions: ['https://photos.google.com/*'],
   // The AI runtime is WebAssembly bundled with the extension; nothing remote is ever executed.
   content_security_policy: {

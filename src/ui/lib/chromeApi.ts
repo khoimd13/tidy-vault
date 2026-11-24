@@ -45,3 +45,15 @@ export async function fetchThumbsViaTab(tabId: number, urls: string[]): Promise<
     }),
   );
 }
+
+/**
+ * Puts Vault Tidy's page script into the tab. Needed when the tab was already open before the
+ * extension was installed or reloaded (Chrome only adds content scripts to pages loaded later).
+ */
+export async function injectContentScript(tabId: number): Promise<void> {
+  const files = chrome.runtime.getManifest().content_scripts?.flatMap((c) => c.js ?? []) ?? [];
+  if (files.length === 0) throw new Error('No page script in the manifest');
+  await chrome.scripting.executeScript({ target: { tabId }, files });
+  // Give the script a moment to load its module and start listening.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+}
