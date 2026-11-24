@@ -1,6 +1,6 @@
 {
   "name": "vault-tidy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Suggestion-only cleanup assistant for Google Photos with on-device AI (Chrome extension).",
   "license": "MIT",
@@ -36,6 +36,8 @@
     "*.{json,md,css,html,yml}": "prettier --write"
   },
   "dependencies": {
+    "@fontsource/be-vietnam-pro": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@huggingface/transformers": "^4.3.2",
     "idb": "^8.0.4",
     "preact": "^10.29.8"

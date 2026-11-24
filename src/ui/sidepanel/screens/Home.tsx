@@ -43,8 +43,13 @@ export function Home({ vault, onReview, onCleanup }: Props) {
         </p>
       )}
 
-      {vault.groups.map((g) => (
-        <GroupCard key={g.categoryId} group={g} onReview={() => onReview(g.categoryId)} />
+      {vault.groups.map((g, i) => (
+        <GroupCard
+          key={g.categoryId}
+          group={g}
+          primary={i === 0}
+          onReview={() => onReview(g.categoryId)}
+        />
       ))}
       {vault.groups.length === 0 && vault.scan.state !== 'running' && aiFinished(vault) && (
         <p class="empty">All caught up. New suggestions show up after your next scan.</p>
@@ -139,7 +144,14 @@ function ScanCard({ vault }: { vault: Vault }) {
   );
 }
 
-function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () => void }) {
+interface GroupCardProps {
+  group: SuggestionGroup;
+  /** Only the top group gets the filled button, so the screen isn't a wall of lavender. */
+  primary: boolean;
+  onReview: () => void;
+}
+
+function GroupCard({ group, primary, onReview }: GroupCardProps) {
   const name = categoryById(group.categoryId)?.name ?? group.categoryId;
   return (
     <section class="card">
@@ -158,7 +170,7 @@ function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () =
         {group.counts.medium > 0 && <span class="chip medium">Medium {group.counts.medium}</span>}
         {group.counts.low > 0 && <span class="chip low">Low {group.counts.low}</span>}
       </div>
-      <button class="primary wide" onClick={onReview}>
+      <button class={primary ? 'primary wide' : 'soft wide'} onClick={onReview}>
         Review
       </button>
     </section>

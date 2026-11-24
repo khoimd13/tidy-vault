@@ -1,29 +1,28 @@
-:root {
-  color-scheme: light dark;
-  --bg: #fafaf9;
-  --card: #ffffff;
-  --text: #1c1c1a;
-  --muted: #6b6b66;
-  --border: #e4e4e0;
-  --accent: #2f7d74;
-  --on-accent: #ffffff;
-  --radius: 12px;
-  --radius-sm: 8px;
-  font:
-    13px/1.5 system-ui,
-    sans-serif;
-}
+/*
+ * "Night studio" theme: deep night background, lavender accent, Space Grotesk for headings and
+ * numbers, Be Vietnam Pro for text (good Vietnamese diacritics). Fonts are bundled, never fetched.
+ */
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/500.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141413;
-    --card: #1f1f1d;
-    --text: #ececea;
-    --muted: #a3a39d;
-    --border: #33332f;
-    --accent: #5fb3a8;
-    --on-accent: #0f2a26;
-  }
+:root {
+  color-scheme: dark;
+  --bg: #14131a;
+  --card: #1e1c27;
+  --card-hover: #252231;
+  --text: #edebf5;
+  --muted: #9a96ae;
+  --border: #2e2b3b;
+  --accent: #b9a4ff;
+  --accent-soft: rgb(185 164 255 / 14%);
+  --on-accent: #1a1530;
+  --danger: #ff9aa8;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font-text: 'Be Vietnam Pro', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 * {
@@ -33,7 +32,7 @@
 /* Set sizes on the page itself, not only :root, so nothing the browser adds can resize them. */
 html,
 body {
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-text);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -42,15 +41,30 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.summary strong,
+.card strong {
+  font-family: var(--font-display);
+  letter-spacing: -0.2px;
 }
 
 h1 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 22px;
+  font-weight: 600;
   margin: 0 0 8px;
 }
 
-h2,
+h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
 h3 {
   font-size: 15px;
   font-weight: 500;
@@ -59,6 +73,10 @@ h3 {
 
 p {
   margin: 0;
+}
+
+a {
+  color: var(--accent);
 }
 
 .screen {
@@ -97,12 +115,21 @@ p {
 
 button {
   font: inherit;
+  font-weight: 500;
   color: var(--text);
-  background: transparent;
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 6px 12px;
+  padding: 7px 14px;
   cursor: pointer;
+  transition:
+    background 120ms,
+    border-color 120ms;
+}
+
+button:hover:not(:disabled) {
+  background: var(--card-hover);
+  border-color: #3d394e;
 }
 
 button.primary {
@@ -111,10 +138,21 @@ button.primary {
   color: var(--on-accent);
 }
 
+button.primary:hover:not(:disabled) {
+  background: #c9b8ff;
+  border-color: #c9b8ff;
+}
+
 button.link {
   border: none;
   padding: 0;
+  background: none;
   color: var(--accent);
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
 }
 
 button.wide {
@@ -423,4 +461,118 @@ details ol {
   font-size: 11px;
   color: var(--muted);
   line-height: 1.3;
+}
+
+/* ---- Night studio details ---- */
+
+.card,
+.summary {
+  border-radius: var(--radius);
+}
+
+.summary strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chip {
+  font-family: var(--font-display);
+  font-weight: 500;
+  padding: 1px 9px;
+  line-height: 18px;
+}
+
+/* Chips sit on photos too: keep them readable on any image. */
+.chip.medium,
+.chip.low {
+  background: rgb(20 19 26 / 78%);
+}
+
+.chip.medium {
+  border-color: var(--accent);
+}
+
+.tile.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--accent-soft);
+}
+
+.tile .check {
+  font-weight: 600;
+}
+
+.tile.kept {
+  outline-color: var(--muted);
+}
+
+.chip.kept-chip {
+  background: rgb(20 19 26 / 85%);
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.notice {
+  background: var(--accent-soft);
+  border-color: rgb(185 164 255 / 40%);
+}
+
+.toast {
+  background: var(--text);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+.toast button.link {
+  color: var(--on-accent);
+}
+
+progress {
+  accent-color: var(--accent);
+  height: 6px;
+}
+
+.strip img,
+.tile img,
+.strip .thumb-placeholder,
+.tile .thumb-placeholder {
+  background: #26232f;
+}
+
+.list a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.list a:hover {
+  color: var(--accent);
+}
+
+details summary {
+  font-weight: 500;
+}
+
+.promises li::marker {
+  color: var(--accent);
+}
+
+.sticky {
+  background: var(--bg);
+}
+
+/* Secondary actions on cards: tinted, not filled. */
+button.soft {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+button.soft:hover:not(:disabled) {
+  background: rgb(185 164 255 / 22%);
+  border-color: transparent;
 }
