@@ -67,8 +67,16 @@ export async function putEmbeddings(list: readonly StoredEmbedding[]): Promise<v
 
 /** Embeddings made by `model`; vectors from other models are ignored. */
 export async function getEmbeddings(model: string): Promise<Map<string, Float32Array>> {
-  const all = await (await db()).getAll('embeddings');
-  return new Map(all.filter((e) => e.model === model).map((e) => [e.id, e.vec]));
+  return (await getEmbeddingsByModel([model])).get(model) ?? new Map();
+}
+
+/** One read of the store, split by model. Vectors from models not asked for are ignored. */
+export async function getEmbeddingsByModel(
+  models: readonly string[],
+): Promise<Map<string, Map<string, Float32Array>>> {
+  const out = new Map(models.map((m) => [m, new Map<string, Float32Array>()]));
+  for (const e of await (await db()).getAll('embeddings')) out.get(e.model)?.set(e.id, e.vec);
+  return out;
 }
 
 export async function clearAll(): Promise<void> {

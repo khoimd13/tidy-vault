@@ -15,6 +15,11 @@ const MODEL_KEY = `${CLIP_MODEL_ID}:q8`;
 /** Text prompt vectors are stored under their own key (id = the prompt text). */
 const TEXT_KEY = `${MODEL_KEY}:text`;
 const BATCH = 8;
+const FETCH_TIMEOUT_MS = 15_000;
+/** Re-render at most this often while analysing; every batch re-scores the whole library. */
+const COMMIT_EVERY_MS = 700;
+/** Give up after this many failed batches in a row (each one restarts the worker first). */
+const MAX_FAILED_BATCHES = 3;
 
 export type AiStatus =
   | { state: 'loading' }
@@ -23,7 +28,10 @@ export type AiStatus =
 
 async function fetchThumb(url: string): Promise<Blob | null> {
   try {
-    const res = await fetch(url, { credentials: 'include' });
+    const res = await fetch(url, {
+      credentials: 'include',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     return res.ok ? await res.blob() : null;
   } catch {
     return null;
@@ -31,39 +39,45 @@ async function fetchThumb(url: string): Promise<Blob | null> {
 }
 
 const analysable = (i: PhotoItem) => i.kind === 'photo' && i.thumbUrl !== '';
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 export function useAnalysis(items: PhotoItem[]) {
   const [status, setStatus] = useState<AiStatus>({ state: 'loading' });
   const [bank, setBank] = useState<TextBank | null>(null);
   const [embeddings, setEmbeddings] = useState<Map<string, Float32Array>>(new Map());
-  const [failedCount, setFailedCount] = useState(0);
+  /** Thumbnail URLs that couldn't be loaded. Keyed by URL, so a rescan with a fresh URL retries. */
+  const [failedUrls, setFailedUrls] = useState<ReadonlySet<string>>(new Set());
 
   const client = useRef<ClipClient | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  /** Always current, even between throttled re-renders. */
   const embRef = useRef(embeddings);
-  const failed = useRef(new Set<string>());
+  const failedRef = useRef(new Set<string>());
   const running = useRef(false);
+  const alive = useRef(true);
+  /** Bumped by reset(); results from an older generation are dropped, not saved. */
+  const generation = useRef(0);
 
-  const commit = (next: Map<string, Float32Array>) => {
-    embRef.current = next;
-    setEmbeddings(next);
-  };
+  const publish = useCallback(() => {
+    setEmbeddings(embRef.current);
+    setFailedUrls(new Set(failedRef.current));
+  }, []);
 
   // Load saved vectors and the model once.
   useEffect(() => {
-    let cancelled = false;
+    alive.current = true;
     const c = new ClipClient();
     client.current = c;
     void (async () => {
       try {
         const texts = [...CATEGORIES.flatMap((cat) => cat.prompts), ...KEEP_PROMPTS];
-        const [saved, savedText] = await Promise.all([
-          store.getEmbeddings(MODEL_KEY),
-          store.getEmbeddings(TEXT_KEY),
-        ]);
-        if (cancelled) return;
-        commit(new Map([...saved, ...embRef.current]));
+        const saved = await store.getEmbeddingsByModel([MODEL_KEY, TEXT_KEY]);
+        const savedImages = saved.get(MODEL_KEY) ?? new Map<string, Float32Array>();
+        const savedText = saved.get(TEXT_KEY) ?? new Map<string, Float32Array>();
+        if (!alive.current) return;
+        embRef.current = new Map([...savedImages, ...embRef.current]);
+        publish();
         // Saved text vectors let saved results show instantly, before the model has loaded.
         if (texts.every((t) => savedText.has(t))) {
           setBank(buildTextBank(CATEGORIES, KEEP_PROMPTS, savedText));
@@ -80,44 +94,60 @@ export function useAnalysis(items: PhotoItem[]) {
           }));
           void store.putEmbeddings(fresh);
           for (const f of fresh) savedText.set(f.id, f.vec);
-          if (cancelled) return;
+          if (!alive.current) return;
           setBank(buildTextBank(CATEGORIES, KEEP_PROMPTS, savedText));
         }
-        if (cancelled) return;
-        setStatus({ state: 'ready', device });
+        if (alive.current) setStatus({ state: 'ready', device });
       } catch (err) {
         console.warn('Vault Tidy: AI model unavailable', err);
-        if (!cancelled) {
-          setStatus({ state: 'unavailable', message: err instanceof Error ? err.message : '' });
-        }
+        if (alive.current) setStatus({ state: 'unavailable', message: message(err) });
       }
     })();
     return () => {
-      cancelled = true;
+      alive.current = false;
       c.dispose();
       client.current = null;
     };
-  }, []);
+  }, [publish]);
 
   // Analyse photos that have no vector yet. One loop at a time; it picks up new items as it goes.
   useEffect(() => {
     if (status.state !== 'ready' || running.current) return;
     running.current = true;
     void (async () => {
+      let failedBatches = 0;
+      let lastPublish = Date.now();
       try {
-        for (;;) {
+        while (alive.current) {
           const c = client.current;
           if (!c) break;
+          const gen = generation.current;
           const todo = itemsRef.current
-            .filter((i) => analysable(i) && !embRef.current.has(i.id) && !failed.current.has(i.id))
+            .filter(
+              (i) =>
+                analysable(i) && !embRef.current.has(i.id) && !failedRef.current.has(i.thumbUrl),
+            )
             .slice(0, BATCH);
           if (todo.length === 0) break;
 
           const blobs = await Promise.all(todo.map((i) => fetchThumb(i.thumbUrl)));
           const ready = todo.filter((_, k) => blobs[k] !== null);
-          const vectors = ready.length
-            ? await c.embedImages(blobs.filter((b): b is Blob => b !== null))
-            : [];
+          let vectors: (Float32Array | null)[] = [];
+          try {
+            if (ready.length) {
+              vectors = await c.embedImages(blobs.filter((b): b is Blob => b !== null));
+            }
+            failedBatches = 0;
+          } catch (err) {
+            if (!alive.current) break;
+            failedBatches += 1;
+            console.warn('Vault Tidy: analysis batch failed, restarting the AI worker', err);
+            if (failedBatches >= MAX_FAILED_BATCHES) throw err;
+            await c.recover();
+            // Retry the same batch once; on a second failure, skip these photos.
+            if (failedBatches < 2) continue;
+          }
+          if (!alive.current || gen !== generation.current) continue;
 
           const next = new Map(embRef.current);
           const toSave: store.StoredEmbedding[] = [];
@@ -128,33 +158,43 @@ export function useAnalysis(items: PhotoItem[]) {
               next.set(item.id, vec);
               toSave.push({ id: item.id, model: MODEL_KEY, vec });
             } else {
-              failed.current.add(item.id);
+              failedRef.current.add(item.thumbUrl);
             }
           });
-          commit(next);
-          setFailedCount(failed.current.size);
+          embRef.current = next;
           void store.putEmbeddings(toSave);
+          if (Date.now() - lastPublish >= COMMIT_EVERY_MS) {
+            publish();
+            lastPublish = Date.now();
+          }
         }
       } catch (err) {
         console.warn('Vault Tidy: analysis stopped', err);
-        setStatus({ state: 'unavailable', message: err instanceof Error ? err.message : '' });
+        if (alive.current) setStatus({ state: 'unavailable', message: message(err) });
       } finally {
         running.current = false;
+        if (alive.current) publish();
       }
     })();
-  }, [status, items]);
+  }, [status, items, publish]);
 
   const reset = useCallback(() => {
-    failed.current.clear();
-    setFailedCount(0);
-    commit(new Map());
-  }, []);
+    generation.current += 1;
+    failedRef.current.clear();
+    embRef.current = new Map();
+    publish();
+  }, [publish]);
 
   const progress = useMemo(() => {
-    const total = items.filter(analysable).length;
-    const done = items.filter((i) => embeddings.has(i.id)).length;
-    return { done, total, failed: failedCount };
-  }, [items, embeddings, failedCount]);
+    const photos = items.filter(analysable);
+    let done = 0;
+    let failed = 0;
+    for (const i of photos) {
+      if (embeddings.has(i.id)) done += 1;
+      else if (failedUrls.has(i.thumbUrl)) failed += 1;
+    }
+    return { done, total: photos.length, failed };
+  }, [items, embeddings, failedUrls]);
 
   return { status, bank, embeddings, progress, reset };
 }

@@ -3,7 +3,7 @@
 export const CLIP_MODEL_ID = 'Xenova/clip-vit-base-patch32';
 
 export type WorkerRequest =
-  | { type: 'init'; id: number; modelBase: string; ortBase: string }
+  | { type: 'init'; id: number; modelBase: string; ortBase: string; forceWasm: boolean }
   | { type: 'embedText'; id: number; texts: string[] }
   | { type: 'embedImages'; id: number; images: Blob[] };
 

@@ -118,10 +118,10 @@ export function useVault() {
 
   // With the AI: only analysed photos are suggested (they appear as analysis runs), so the cruder
   // shape rule never shows wrong suggestions that then disappear. Without it: shape rule only.
+  // If the model stops part-way, photos it already analysed keep their AI results.
   const classifier = useMemo(() => {
-    if (ai.status.state === 'unavailable') return heuristicClassifier;
-    if (!ai.bank) return noSuggestions;
-    return createClipClassifier(ai.bank, ai.embeddings, noSuggestions);
+    const unanalysed = ai.status.state === 'unavailable' ? heuristicClassifier : noSuggestions;
+    return ai.bank ? createClipClassifier(ai.bank, ai.embeddings, unanalysed) : unanalysed;
   }, [ai.status.state, ai.bank, ai.embeddings]);
 
   const groups = useMemo(

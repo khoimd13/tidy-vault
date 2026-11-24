@@ -32,7 +32,7 @@ function post(msg: WorkerResponse): void {
   self.postMessage(msg);
 }
 
-async function load(modelBase: string, ortBase: string): Promise<Loaded> {
+async function load(modelBase: string, ortBase: string, forceWasm: boolean): Promise<Loaded> {
   env.allowRemoteModels = false;
   env.allowLocalModels = true;
   env.localModelPath = modelBase;
@@ -51,24 +51,30 @@ async function load(modelBase: string, ortBase: string): Promise<Loaded> {
   const tokenizer = await AutoTokenizer.from_pretrained(CLIP_MODEL_ID);
   const processor = await AutoProcessor.from_pretrained(CLIP_MODEL_ID);
 
-  const hasWebGpu = 'gpu' in navigator;
-  for (const device of hasWebGpu ? (['webgpu', 'wasm'] as const) : (['wasm'] as const)) {
-    try {
-      const textModel = await CLIPTextModelWithProjection.from_pretrained(CLIP_MODEL_ID, {
-        dtype: 'q8',
-        device,
-      });
-      const visionModel = await CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL_ID, {
-        dtype: 'q8',
-        device,
-      });
-      return { tokenizer, textModel, processor, visionModel, device };
-    } catch (err) {
-      if (device === 'wasm') throw err;
-      console.warn('Vault Tidy: WebGPU unavailable, falling back to WASM', err);
-    }
+  // One device per worker: transformers.js chains all session creation on one promise, so after a
+  // failed WebGPU attempt nothing else can load in this worker. The client retries in a fresh
+  // worker with `forceWasm` instead.
+  const device = !forceWasm && (await hasUsableGpu()) ? 'webgpu' : 'wasm';
+  const textModel = await CLIPTextModelWithProjection.from_pretrained(CLIP_MODEL_ID, {
+    dtype: 'q8',
+    device,
+  });
+  const visionModel = await CLIPVisionModelWithProjection.from_pretrained(CLIP_MODEL_ID, {
+    dtype: 'q8',
+    device,
+  });
+  return { tokenizer, textModel, processor, visionModel, device };
+}
+
+/** `'gpu' in navigator` is true even without a usable GPU; ask for an adapter to be sure. */
+async function hasUsableGpu(): Promise<boolean> {
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+  if (!gpu) return false;
+  try {
+    return (await gpu.requestAdapter()) !== null;
+  } catch {
+    return false;
   }
-  throw new Error('No device available');
 }
 
 function rows(tensor: Tensor): Float32Array[] {
@@ -99,7 +105,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     switch (msg.type) {
       case 'init': {
-        loaded ??= load(msg.modelBase, msg.ortBase);
+        loaded ??= load(msg.modelBase, msg.ortBase, msg.forceWasm);
         const m = await loaded;
         post({ type: 'ready', id: msg.id, device: m.device });
         break;

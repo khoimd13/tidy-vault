@@ -40,3 +40,17 @@ describe('embeddings store', () => {
     expect((await store.getEmbeddings('m1')).size).toBe(0);
   });
 });
+
+describe('getEmbeddingsByModel', () => {
+  it('splits one read by model and ignores others', async () => {
+    await store.putEmbeddings([
+      { id: 'a', model: 'img', vec: new Float32Array([1]) },
+      { id: 'prompt', model: 'txt', vec: new Float32Array([2]) },
+      { id: 'old', model: 'other', vec: new Float32Array([3]) },
+    ]);
+    const byModel = await store.getEmbeddingsByModel(['img', 'txt']);
+    expect([...(byModel.get('img')?.keys() ?? [])]).toEqual(['a']);
+    expect([...(byModel.get('txt')?.keys() ?? [])]).toEqual(['prompt']);
+    expect(byModel.has('other')).toBe(false);
+  });
+});
