@@ -69,3 +69,13 @@ export async function addToNewAlbumViaTab(
   const res = await sendToTab(tabId, { type: 'album/add', name, mediaKeys });
   return res.album ?? { ok: false, error: 'The Google Photos tab did not answer' };
 }
+
+/** Remembers how many photos are waiting, for the monthly reminder badge (see background). */
+export async function savePendingCount(count: number): Promise<void> {
+  await chrome.storage.local.set({ pendingCount: count });
+}
+
+/** The panel is open, so the reminder has done its job. */
+export async function clearBadge(): Promise<void> {
+  await chrome.action?.setBadgeText({ text: '' });
+}

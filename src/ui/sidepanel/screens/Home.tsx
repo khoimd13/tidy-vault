@@ -1,7 +1,16 @@
+import { useEffect, useState } from 'preact/hooks';
 import { categoryById } from '../../../shared/categories';
+import { estimateBytes, formatApproxSize } from '../../../suggest/space';
 import type { SuggestionGroup } from '../../../suggest/suggestions';
-import { openGooglePhotos } from '../../lib/chromeApi';
-import { formatSpan } from '../../lib/format';
+import { useI18n, type I18n } from '../../i18n';
+import {
+  clearBadge,
+  getFlag,
+  openGooglePhotos,
+  savePendingCount,
+  setFlag,
+} from '../../lib/chromeApi';
+import { AiSparkle } from '../components/AiSparkle';
 import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
 
@@ -11,77 +20,143 @@ interface Props {
   onCleanup: () => void;
 }
 
+const REMINDER = 'reminder';
+
+function monthOf(iso: string, locale: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t)
+    ? iso
+    : new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric' }).format(new Date(t));
+}
+
+function span(i18n: I18n, s: { from: string; to: string }): string {
+  const from = monthOf(s.from, i18n.locale);
+  const to = monthOf(s.to, i18n.locale);
+  return from === to ? i18n.t('mostlyOne', { m: from }) : i18n.t('mostly', { from, to });
+}
+
 export function Home({ vault, onReview, onCleanup }: Props) {
+  const i18n = useI18n();
+  const { t, n } = i18n;
   // A photo can be in several groups; count it once.
-  const total = new Set(vault.groups.flatMap((g) => g.suggestions.map((s) => s.item.id))).size;
+  const all = vault.groups.flatMap((g) => g.suggestions);
+  const total = new Set(all.map((s) => s.item.id)).size;
+  const bytes = estimateBytes(all);
   const hasData = vault.itemCount > 0 || vault.counts.clutter > 0 || vault.counts.kept > 0;
+
+  // Keep the reminder badge's count current, and clear the badge now the panel is open.
+  useEffect(() => {
+    void savePendingCount(total);
+  }, [total]);
+  useEffect(() => {
+    void clearBadge();
+  }, []);
 
   return (
     <main class="screen">
       <header class="row">
-        <h2 tabIndex={-1}>Suggestions</h2>
+        <h2 tabIndex={-1}>{t('suggestions')}</h2>
       </header>
 
       {hasData && (
         <section class="summary row">
           <div class="stack">
-            <strong>{total.toLocaleString()} to review</strong>
+            <strong>{t('toReview', { n: n(total) })}</strong>
+            {bytes > 0 && (
+              <span class="space" title={t('estimateNote')}>
+                {t('couldFree', { size: formatApproxSize(bytes, i18n.locale) })}
+              </span>
+            )}
             <span class="muted">
-              {vault.counts.clutter.toLocaleString()} on your cleanup list ·{' '}
-              {vault.counts.kept.toLocaleString()} kept
+              {t('listAndKept', { c: n(vault.counts.clutter), k: n(vault.counts.kept) })}
             </span>
           </div>
-          {vault.counts.clutter > 0 && <button onClick={onCleanup}>Cleanup list</button>}
+          {vault.counts.clutter > 0 && <button onClick={onCleanup}>{t('cleanupList')}</button>}
         </section>
       )}
 
-      <ScanCard vault={vault} />
-      <AiLine vault={vault} />
+      <ScanCard vault={vault} i18n={i18n} />
+      <AiLine vault={vault} i18n={i18n} />
       {vault.error && (
         <p class="notice" role="alert">
-          {vault.error}
+          {vault.error.code === 'notConnected'
+            ? `${t('notConnected')} (${vault.error.detail})`
+            : vault.error.detail}
         </p>
       )}
 
       {vault.groups.map((g, i) => (
         <GroupCard
           key={g.categoryId}
+          i18n={i18n}
           group={g}
           primary={i === 0}
           onReview={() => onReview(g.categoryId)}
         />
       ))}
       {vault.groups.length === 0 && vault.scan.state !== 'running' && aiFinished(vault) && (
-        <p class="empty">All caught up. New suggestions show up after your next scan.</p>
+        <p class="empty">{t('allCaught')}</p>
       )}
 
       <footer class="footer muted">
-        <span>Analysed on this computer. Nothing is deleted.</span>
+        <span>{t('footer')}</span>
         {hasData && (
           <button
             class="link"
             onClick={() => {
-              if (
-                confirm('Clear all Vault Tidy data on this computer? Your photos are not affected.')
-              )
-                void vault.clearAll();
+              if (confirm(t('clearConfirm'))) void vault.clearAll();
             }}
           >
-            Clear local data
+            {t('clearData')}
           </button>
         )}
       </footer>
+      <Settings i18n={i18n} />
     </main>
   );
 }
 
-function ScanCard({ vault }: { vault: Vault }) {
+function Settings({ i18n }: { i18n: I18n }) {
+  const { t, lang, setLang } = i18n;
+  const [reminder, setReminder] = useState(false);
+  useEffect(() => {
+    void getFlag(REMINDER).then(setReminder);
+  }, []);
+  return (
+    <section class="settings muted">
+      <label title={t('reminderHint')}>
+        <input
+          type="checkbox"
+          checked={reminder}
+          onChange={(e) => {
+            const on = e.currentTarget.checked;
+            setReminder(on);
+            void setFlag(REMINDER, on);
+          }}
+        />
+        {t('reminder')}
+      </label>
+      <div class="row" style={{ justifyContent: 'flex-start' }}>
+        <button
+          class="link"
+          lang={lang === 'vi' ? 'en' : 'vi'}
+          onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
+        >
+          {lang === 'vi' ? 'English' : 'Tiếng Việt'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
+  const { t, n } = i18n;
   if (!vault.onPhotos) {
     return (
       <section class="card">
-        <p>Open Google Photos in this window to find suggestions.</p>
+        <p>{t('openPhotosPrompt')}</p>
         <button class="primary" onClick={() => void openGooglePhotos()}>
-          Open Google Photos
+          {t('openPhotos')}
         </button>
       </section>
     );
@@ -89,31 +164,31 @@ function ScanCard({ vault }: { vault: Vault }) {
 
   const { state, seen } = vault.scan;
   const running = state === 'running' || state === 'paused';
-  const looked = `Looked at ${seen.toLocaleString()} photos`;
+  const looked = t('lookedAt', { n: n(seen > 0 ? seen : vault.itemCount) });
 
   if (running) {
     return (
       <section class="card">
         <div class="row">
-          <strong>{state === 'paused' ? 'Paused' : 'Finding suggestions…'}</strong>
+          <strong>{state === 'paused' ? t('paused') : t('finding')}</strong>
           <span class="muted">{looked}</span>
         </div>
         {state === 'running' ? (
-          <progress aria-label="Scan progress" />
+          <progress aria-label={t('finding')} />
         ) : (
-          <progress aria-label="Scan paused" value={0} max={1} />
+          <progress aria-label={t('paused')} value={0} max={1} />
         )}
         <div class="actions">
           {state === 'running' ? (
-            <button onClick={() => void vault.command('scan/pause')}>Pause</button>
+            <button onClick={() => void vault.command('scan/pause')}>{t('pause')}</button>
           ) : (
             <button class="primary" onClick={() => void vault.command('scan/resume')}>
-              Resume
+              {t('resume')}
             </button>
           )}
-          <button onClick={() => void vault.command('scan/cancel')}>Stop</button>
+          <button onClick={() => void vault.command('scan/cancel')}>{t('stop')}</button>
         </div>
-        <p class="hint muted">You can start reviewing while this runs.</p>
+        <p class="hint muted">{t('reviewWhileRuns')}</p>
       </section>
     );
   }
@@ -123,55 +198,77 @@ function ScanCard({ vault }: { vault: Vault }) {
     return (
       <section class="card row">
         <span class="muted">
-          {seen > 0 ? looked : `${vault.itemCount.toLocaleString()} photos looked at`}
-          {state === 'cancelled' && ' (stopped)'}
+          {looked}
+          {state === 'cancelled' && t('stopped')}
         </span>
-        <button onClick={() => void vault.command('scan/start')}>Scan again</button>
+        <button onClick={() => void vault.command('scan/start')}>{t('scanAgain')}</button>
       </section>
     );
   }
 
   return (
     <section class="card">
-      <p>
-        Vault Tidy scrolls through what Google Photos is showing (your library, a search, or an
-        album) and suggests photos you might not need.
-      </p>
+      <p>{t('scanIntro')}</p>
       <button class="primary" onClick={() => void vault.command('scan/start')}>
-        Find suggestions
+        {t('findSuggestions')}
       </button>
     </section>
   );
 }
 
 interface GroupCardProps {
+  i18n: I18n;
   group: SuggestionGroup;
   /** Only the top group gets the filled button, so the screen isn't a wall of lavender. */
   primary: boolean;
   onReview: () => void;
 }
 
-function GroupCard({ group, primary, onReview }: GroupCardProps) {
-  const name = categoryById(group.categoryId)?.name ?? group.categoryId;
+function GroupCard({ i18n, group, primary, onReview }: GroupCardProps) {
+  const { t, n } = i18n;
+  const name = i18n.category(group.categoryId, categoryById(group.categoryId)?.name);
+  const reason = group.topReason ? i18n.reason(group.topReason) : null;
+  const bytes = estimateBytes(group.suggestions);
   return (
     <section class="card">
-      <h3>
-        {group.suggestions.length.toLocaleString()} {name.toLowerCase()}
-      </h3>
-      {group.span && <p class="muted">{formatSpan(group.span)}</p>}
+      <div class="row">
+        <h3>
+          {n(group.suggestions.length)} {name.toLowerCase()}
+        </h3>
+        {bytes > 0 && (
+          <span class="space" title={t('estimateNote')}>
+            {formatApproxSize(bytes, i18n.locale)}
+          </span>
+        )}
+      </div>
+      {group.span && <p class="muted">{span(i18n, group.span)}</p>}
       <div class="strip" aria-hidden="true">
         {group.samples.map((s) => (
           <Thumb key={s.item.id} item={s.item} />
         ))}
       </div>
-      {group.topReason && <p class="muted">Why: {group.topReason.toLowerCase()}</p>}
+      {reason && (
+        <p class="muted">{t('why', { r: reason.charAt(0).toLowerCase() + reason.slice(1) })}</p>
+      )}
       <div class="chips">
-        {group.counts.high > 0 && <span class="chip high">High {group.counts.high}</span>}
-        {group.counts.medium > 0 && <span class="chip medium">Medium {group.counts.medium}</span>}
-        {group.counts.low > 0 && <span class="chip low">Low {group.counts.low}</span>}
+        {group.counts.high > 0 && (
+          <span class="chip high">
+            {t('high')} {n(group.counts.high)}
+          </span>
+        )}
+        {group.counts.medium > 0 && (
+          <span class="chip medium">
+            {t('medium')} {n(group.counts.medium)}
+          </span>
+        )}
+        {group.counts.low > 0 && (
+          <span class="chip low">
+            {t('low')} {n(group.counts.low)}
+          </span>
+        )}
       </div>
       <button class={primary ? 'primary wide' : 'soft wide'} onClick={onReview}>
-        Review
+        {t('review')}
       </button>
     </section>
   );
@@ -184,64 +281,53 @@ function aiFinished(vault: Vault): boolean {
   return progress.done > 0 && progress.done + progress.failed >= progress.total;
 }
 
-/** One quiet line about the AI model: loading, analysing (with progress), done, or unavailable. */
-function AiLine({ vault }: { vault: Vault }) {
+/** The AI status: sparkle loader while waking up or analysing, a quiet line when done. */
+function AiLine({ vault, i18n }: { vault: Vault; i18n: I18n }) {
+  const { t, n } = i18n;
   const { status, progress } = vault.ai;
   // The page reader found photos but none of their thumbnails: say so plainly instead of
   // looking like there is nothing to clean up.
   if (progress.total === 0 && progress.noThumbnail > 0) {
     return (
       <p class="notice" role="alert">
-        Vault Tidy found {progress.noThumbnail.toLocaleString()} photos but couldn't read their
-        thumbnails, so the AI can't look at them. Reload the Google Photos tab and scan again. If
-        this keeps happening, Google Photos has changed its page and Vault Tidy needs an update.
+        {t('noThumbs', { n: n(progress.noThumbnail) })}
       </p>
     );
   }
   if (status.state === 'ready' && progress.done === 0 && progress.failed > 0) {
     return (
       <p class="notice" role="alert">
-        Couldn't load any of the {progress.failed.toLocaleString()} thumbnails, so the AI can't look
-        at them. Check that you're signed in to Google Photos in this browser, then scan again.
+        {t('noneLoaded', { n: n(progress.failed) })}
       </p>
     );
   }
   if (status.state === 'unavailable') {
     return (
       <p class="notice" title={status.message}>
-        The AI model isn't available, so only screenshot shapes are used. Other categories need it.
+        {t('aiUnavailable')}
       </p>
     );
   }
   if (status.state === 'loading') {
     // Saved results already show; only mention loading when there's new work waiting for it.
-    return progress.done < progress.total ? <p class="ai muted">Loading the AI model…</p> : null;
+    return progress.done < progress.total ? <AiSparkle label={t('aiWaking')} /> : null;
   }
   const left = progress.total - progress.done - progress.failed;
   if (left > 0) {
     return (
-      <div class="ai">
-        <div class="row">
-          <span>Analysing photos with AI…</span>
-          <span class="muted">
-            {progress.done.toLocaleString()} of {progress.total.toLocaleString()}
-          </span>
-        </div>
-        <progress
-          aria-label="AI analysis progress"
-          value={progress.done}
-          max={Math.max(1, progress.total)}
-        />
-      </div>
+      <AiSparkle
+        label={t('aiAnalysing')}
+        detail={t('ofN', { a: n(progress.done), b: n(progress.total) })}
+        progress={progress.done / Math.max(1, progress.total)}
+      />
     );
   }
   if (progress.done === 0) return null;
   return (
     <p class="ai muted">
-      AI analysed {progress.done.toLocaleString()} photos on this computer
-      {progress.failed > 0 && ` (${progress.failed.toLocaleString()} couldn't be loaded)`}.
-      {vault.learnedFrom > 0 &&
-        ` Suggestions are tuned by your ${vault.learnedFrom.toLocaleString()} choices.`}
+      {t('aiDone', { n: n(progress.done) })}
+      {progress.failed > 0 && t('aiFailed', { n: n(progress.failed) })}.
+      {vault.learnedFrom > 0 && t('tuned', { n: n(vault.learnedFrom) })}
     </p>
   );
 }

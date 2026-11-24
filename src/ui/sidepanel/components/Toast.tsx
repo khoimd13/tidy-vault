@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useI18n } from '../../i18n';
 
 /** Long enough to notice and react; paused while the pointer or focus is on the toast. */
 const UNDO_MS = 10000;
@@ -44,6 +45,7 @@ export type ToastApi = ReturnType<typeof useToast>;
  * It lives in App, so Undo survives moving between screens.
  */
 export function Toast({ state }: { state: ToastApi }) {
+  const { t } = useI18n();
   const { data } = state;
   return (
     <div
@@ -65,7 +67,7 @@ export function Toast({ state }: { state: ToastApi }) {
               state.hide();
             }}
           >
-            Undo
+            {t('undo')}
           </button>
         </div>
       )}

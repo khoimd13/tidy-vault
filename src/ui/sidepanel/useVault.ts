@@ -26,7 +26,11 @@ export interface ScanStatus {
   seen: number;
 }
 
-const NOT_CONNECTED = 'Reload the Google Photos tab so Vault Tidy can connect to it.';
+/** Shown translated by the panel; `detail` is the technical reason, kept as-is. */
+export interface VaultError {
+  code: 'notConnected' | 'scanError';
+  detail: string;
+}
 
 function mergeItems(prev: PhotoItem[], next: PhotoItem[]): PhotoItem[] {
   const byId = new Map(prev.map((i) => [i.id, i]));
@@ -43,7 +47,7 @@ export function useVault() {
   const [scan, setScan] = useState<ScanStatus>({ state: 'idle', seen: 0 });
   const [items, setItems] = useState<PhotoItem[]>([]);
   const [decisions, setDecisions] = useState<Map<string, Decision>>(new Map());
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<VaultError | null>(null);
   /** Bumped on every successful ping, so work that stopped while disconnected starts again. */
   const [connection, setConnection] = useState(0);
 
@@ -95,7 +99,7 @@ export function useVault() {
           setScan({ state: msg.reason === 'end' ? 'done' : 'cancelled', seen: msg.seen });
           break;
         case 'scan/error':
-          setError(msg.message);
+          setError({ code: 'scanError', detail: msg.message });
           break;
       }
     };
@@ -127,7 +131,10 @@ export function useVault() {
         setError(null);
       } catch (err) {
         console.warn('Vault Tidy: cannot reach the Google Photos tab', err);
-        setError(`${NOT_CONNECTED} (${err instanceof Error ? err.message : String(err)})`);
+        setError({
+          code: 'notConnected',
+          detail: err instanceof Error ? err.message : String(err),
+        });
       }
     },
     [tabId, addItems],
@@ -231,6 +238,26 @@ export function useVault() {
     });
   }, []);
 
+  /**
+   * A larger version of a photo for the detail view, downloaded through the Google Photos tab
+   * (Google's image links need the session). Object URLs are cached for the panel's lifetime.
+   */
+  const largeCache = useRef(new Map<string, Promise<string | null>>());
+  const largeImage = useCallback(
+    (item: PhotoItem): Promise<string | null> => {
+      const cached = largeCache.current.get(item.id);
+      if (cached) return cached;
+      if (tabId === null || !/=wd+-hd+/.test(item.thumbUrl)) return Promise.resolve(null);
+      const url = item.thumbUrl.replace(/=wd+-hd+/, '=w1200-h1200');
+      const loading = fetchThumbsViaTab(tabId, [url])
+        .then(([blob]) => (blob ? URL.createObjectURL(blob) : null))
+        .catch(() => null);
+      largeCache.current.set(item.id, loading);
+      return loading;
+    },
+    [tabId],
+  );
+
   /** Puts the given photos in a new private album in Google Photos (never deletes anything). */
   const makeAlbum = useCallback(
     async (name: string, ids: string[]): Promise<AlbumOutcome> => {
@@ -280,6 +307,8 @@ export function useVault() {
     decide,
     restore,
     makeAlbum,
+    largeImage,
+    isDecided: (id: string) => decisions.has(id),
     undo,
     clearAll,
   };
