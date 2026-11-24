@@ -1,0 +1,13 @@
+# Guard: this repo may only be pushed to the personal GitHub account.
+url="$2"
+case "$url" in
+  git@github-personal:*) ;;
+  *) echo "pre-push blocked: remote '$url' is not git@github-personal:... (personal account)." >&2; exit 1 ;;
+esac
+email="$(git config user.email)"
+case "$email" in
+  *@users.noreply.github.com) ;;
+  *) echo "pre-push blocked: user.email is '$email', expected the personal noreply address." >&2; exit 1 ;;
+esac
+
+npm run check

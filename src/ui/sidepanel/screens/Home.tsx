@@ -1,0 +1,164 @@
+import { categoryById } from '../../../shared/categories';
+import type { SuggestionGroup } from '../../../suggest/suggestions';
+import { openGooglePhotos } from '../../lib/chromeApi';
+import { formatSpan } from '../../lib/format';
+import type { Vault } from '../useVault';
+
+interface Props {
+  vault: Vault;
+  onReview: (categoryId: string) => void;
+  onCleanup: () => void;
+}
+
+export function Home({ vault, onReview, onCleanup }: Props) {
+  const total = vault.groups.reduce((n, g) => n + g.suggestions.length, 0);
+  const hasData = vault.itemCount > 0 || vault.counts.clutter > 0 || vault.counts.kept > 0;
+
+  return (
+    <main class="screen">
+      <header class="row">
+        <h2 tabIndex={-1}>Suggestions</h2>
+      </header>
+
+      {hasData && (
+        <section class="summary row">
+          <div class="stack">
+            <strong>{total.toLocaleString()} to review</strong>
+            <span class="muted">
+              {vault.counts.clutter.toLocaleString()} on your cleanup list ·{' '}
+              {vault.counts.kept.toLocaleString()} kept
+            </span>
+          </div>
+          {vault.counts.clutter > 0 && <button onClick={onCleanup}>Cleanup list</button>}
+        </section>
+      )}
+
+      <ScanCard vault={vault} />
+      {vault.error && (
+        <p class="notice" role="alert">
+          {vault.error}
+        </p>
+      )}
+
+      {vault.groups.map((g) => (
+        <GroupCard key={g.categoryId} group={g} onReview={() => onReview(g.categoryId)} />
+      ))}
+      {vault.itemCount > 0 && vault.groups.length === 0 && vault.scan.state !== 'running' && (
+        <p class="empty">All caught up. New suggestions show up after your next scan.</p>
+      )}
+
+      <footer class="footer muted">
+        <span>Analysed on this computer. Nothing is deleted.</span>
+        {hasData && (
+          <button
+            class="link"
+            onClick={() => {
+              if (
+                confirm('Clear all Vault Tidy data on this computer? Your photos are not affected.')
+              )
+                void vault.clearAll();
+            }}
+          >
+            Clear local data
+          </button>
+        )}
+      </footer>
+    </main>
+  );
+}
+
+function ScanCard({ vault }: { vault: Vault }) {
+  if (!vault.onPhotos) {
+    return (
+      <section class="card">
+        <p>Open Google Photos in this window to find suggestions.</p>
+        <button class="primary" onClick={() => void openGooglePhotos()}>
+          Open Google Photos
+        </button>
+      </section>
+    );
+  }
+
+  const { state, seen } = vault.scan;
+  const running = state === 'running' || state === 'paused';
+  const looked = `Looked at ${seen.toLocaleString()} photos`;
+
+  if (running) {
+    return (
+      <section class="card">
+        <div class="row">
+          <strong>{state === 'paused' ? 'Paused' : 'Finding suggestions…'}</strong>
+          <span class="muted">{looked}</span>
+        </div>
+        {state === 'running' ? (
+          <progress aria-label="Scan progress" />
+        ) : (
+          <progress aria-label="Scan paused" value={0} max={1} />
+        )}
+        <div class="actions">
+          {state === 'running' ? (
+            <button onClick={() => void vault.command('scan/pause')}>Pause</button>
+          ) : (
+            <button class="primary" onClick={() => void vault.command('scan/resume')}>
+              Resume
+            </button>
+          )}
+          <button onClick={() => void vault.command('scan/cancel')}>Stop</button>
+        </div>
+        <p class="hint muted">You can start reviewing while this runs.</p>
+      </section>
+    );
+  }
+
+  // After a scan, reviewing is the main job, so scanning again becomes a quiet secondary action.
+  if (state === 'done' || state === 'cancelled' || vault.itemCount > 0) {
+    return (
+      <section class="card row">
+        <span class="muted">
+          {seen > 0 ? looked : `${vault.itemCount.toLocaleString()} photos looked at`}
+          {state === 'cancelled' && ' (stopped)'}
+        </span>
+        <button onClick={() => void vault.command('scan/start')}>Scan again</button>
+      </section>
+    );
+  }
+
+  return (
+    <section class="card">
+      <p>
+        Vault Tidy scrolls through what Google Photos is showing (your library, a search, or an
+        album) and suggests photos you might not need.
+      </p>
+      <button class="primary" onClick={() => void vault.command('scan/start')}>
+        Find suggestions
+      </button>
+    </section>
+  );
+}
+
+function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () => void }) {
+  const name = categoryById(group.categoryId)?.name ?? group.categoryId;
+  const samples = group.suggestions.slice(0, 6);
+  return (
+    <section class="card">
+      <h3>
+        {group.suggestions.length.toLocaleString()} {name.toLowerCase()}
+      </h3>
+      {group.span && <p class="muted">{formatSpan(group.span)}</p>}
+      <div class="strip" aria-hidden="true">
+        {samples.map((s) => (
+          <img key={s.item.id} src={s.item.thumbUrl} alt="" loading="lazy" />
+        ))}
+      </div>
+      {group.topReason && <p class="muted">Why: {group.topReason.toLowerCase()}</p>}
+      <div class="chips">
+        {group.counts.high > 0 && <span class="chip high">High {group.counts.high}</span>}
+        {group.counts.medium > 0 && <span class="chip medium">Medium {group.counts.medium}</span>}
+        {group.counts.low > 0 && <span class="chip low">Low {group.counts.low}</span>}
+      </div>
+      <button class="primary wide" onClick={onReview}>
+        Review
+      </button>
+    </section>
+  );
+}

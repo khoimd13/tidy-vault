@@ -1,0 +1,132 @@
+/**
+ * Dev-only fake of the extension APIs the side panel uses, so the UI can be reviewed in a normal
+ * browser tab with fake photos. Never bundled into the extension.
+ */
+import type { ContentToPanel, PanelToContent } from '../src/shared/messages';
+import type { PhotoItem, ScanState } from '../src/shared/types';
+
+type Listener = (msg: unknown, sender: { tab?: { id?: number } }) => void;
+
+const COLORS = ['#dfe7f5', '#f5e6d8', '#e3f1ea', '#efe3f3', '#f3efd9', '#e6e6e6'];
+
+function fakeThumb(i: number, aspect: number): string {
+  const w = 224;
+  const h = Math.round(w / aspect);
+  const bg = COLORS[i % COLORS.length] ?? '#eee';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <rect width="100%" height="100%" fill="${bg}"/>
+    <rect x="16" y="20" width="${w - 32}" height="14" rx="4" fill="#0002"/>
+    <rect x="16" y="48" width="${w - 80}" height="10" rx="4" fill="#0001"/>
+    <rect x="16" y="${h * 0.45}" width="${w - 32}" height="${h * 0.3}" rx="8" fill="#0001"/>
+    <text x="16" y="${h - 20}" font-family="sans-serif" font-size="14" fill="#0006">#${i}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function fakeItem(i: number): PhotoItem {
+  // Roughly: half screenshots (phone shape), some desktop screenshots, the rest camera photos.
+  const shapes = [9 / 19.5, 3 / 4, 9 / 20, 4 / 3, 16 / 9, 9 / 16, 3 / 4];
+  const aspect = shapes[i % shapes.length] ?? 1;
+  const year = 2019 + (i % 7);
+  const month = String((i % 12) + 1).padStart(2, '0');
+  return {
+    id: `fake${i}`,
+    url: `https://photos.google.com/photo/fake${i}`,
+    thumbUrl: fakeThumb(i, aspect),
+    takenAt: `${year}-${month}-15`,
+    aspect,
+    kind: i % 13 === 0 ? 'video' : 'photo',
+    label: `Photo - ${year}`,
+  };
+}
+
+const listeners = new Set<Listener>();
+const storage = new Map<string, unknown>();
+const TOTAL = 240;
+const PER_STEP = 24;
+
+let state: ScanState = 'idle';
+let seen = 0;
+let timer: ReturnType<typeof setInterval> | undefined;
+
+function emit(msg: ContentToPanel) {
+  for (const l of listeners) l(msg, { tab: { id: 1 } });
+}
+
+function step() {
+  if (state !== 'running') return;
+  const next = Array.from({ length: Math.min(PER_STEP, TOTAL - seen) }, (_, k) =>
+    fakeItem(seen + k),
+  );
+  seen += next.length;
+  if (next.length) emit({ type: 'scan/items', items: next });
+  emit({ type: 'scan/progress', seen, state });
+  if (seen >= TOTAL) {
+    state = 'done';
+    clearInterval(timer);
+    emit({ type: 'scan/done', seen, reason: 'end' });
+  }
+}
+
+function handle(msg: PanelToContent) {
+  switch (msg.type) {
+    case 'scan/start':
+      if (state === 'running' || state === 'paused') break;
+      state = 'running';
+      seen = 0;
+      clearInterval(timer);
+      timer = setInterval(step, 500);
+      break;
+    case 'scan/pause':
+      if (state === 'running') state = 'paused';
+      break;
+    case 'scan/resume':
+      if (state === 'paused') state = 'running';
+      break;
+    case 'scan/cancel':
+      if (state === 'running' || state === 'paused') {
+        state = 'cancelled';
+        clearInterval(timer);
+        emit({ type: 'scan/done', seen, reason: 'cancelled' });
+      }
+      break;
+    case 'ping':
+      break;
+  }
+  return { ok: true, state, seen };
+}
+
+const params = new URLSearchParams(location.search);
+const onPhotos = params.get('photos') !== 'no';
+if (params.get('welcome') === 'no') storage.set('welcomed', true);
+
+const noop = () => undefined;
+const event = { addListener: noop, removeListener: noop };
+
+(globalThis as unknown as { chrome: unknown }).chrome = {
+  tabs: {
+    query: () =>
+      Promise.resolve([{ id: 1, url: onPhotos ? 'https://photos.google.com/' : 'https://x.y/' }]),
+    sendMessage: (_id: number, msg: PanelToContent) => Promise.resolve(handle(msg)),
+    create: ({ url }: { url: string }) => {
+      window.open(url, '_blank');
+      return Promise.resolve({});
+    },
+    onActivated: event,
+    onUpdated: event,
+  },
+  runtime: {
+    onMessage: {
+      addListener: (l: Listener) => listeners.add(l),
+      removeListener: (l: Listener) => listeners.delete(l),
+    },
+  },
+  storage: {
+    local: {
+      get: (key: string) => Promise.resolve({ [key]: storage.get(key) }),
+      set: (obj: Record<string, unknown>) => {
+        for (const [k, v] of Object.entries(obj)) storage.set(k, v);
+        return Promise.resolve();
+      },
+    },
+  },
+};
