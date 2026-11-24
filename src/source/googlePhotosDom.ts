@@ -69,6 +69,33 @@ function findThumb(tile: Element): string {
     if (!parent || parent.querySelectorAll(PHOTO_LINK).length > 1) break;
     scope = parent;
   }
+  return thumbUnder(tile);
+}
+
+/** Background image from CSS (classes or inline), as the browser computed it. */
+function computedThumb(el: Element): string {
+  const m = /url\(["']?(.*?)["']?\)/.exec(getComputedStyle(el).backgroundImage);
+  return m?.[1]?.includes(THUMB_HOST) ? m[1] : '';
+}
+
+/**
+ * Layout-independent fallback: ask the browser what is drawn at the centre of the tile. Works
+ * when the link is a transparent layer above an image that lives elsewhere in the page. Only
+ * possible for tiles currently on screen; the scanner re-reads tiles until they have a thumbnail.
+ */
+function thumbUnder(tile: Element): string {
+  const doc = tile.ownerDocument;
+  if (typeof doc.elementsFromPoint !== 'function') return '';
+  const r = tile.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return '';
+  const x = r.left + r.width / 2;
+  const y = r.top + r.height / 2;
+  const view = doc.defaultView;
+  if (!view || x < 0 || y < 0 || x > view.innerWidth || y > view.innerHeight) return '';
+  for (const el of doc.elementsFromPoint(x, y)) {
+    const url = thumbOf(el) || computedThumb(el);
+    if (url) return url;
+  }
   return '';
 }
 

@@ -29,7 +29,8 @@ export const DEFAULT_SCAN_OPTIONS: ScanOptions = {
 /** Scrolls through the grid, reporting each new item once. Supports pause, resume and cancel. */
 export class Scanner {
   private state: ScanState = 'idle';
-  private readonly seen = new Set<string>();
+  /** id → whether we already reported it with a thumbnail. */
+  private readonly seen = new Map<string, boolean>();
   private wake: (() => void) | null = null;
 
   constructor(
@@ -76,14 +77,17 @@ export class Scanner {
         continue;
       }
 
-      const fresh = this.deps.readItems().filter((i) => !this.seen.has(i.id));
-      for (const i of fresh) this.seen.add(i.id);
-      if (fresh.length > 0) {
-        this.deps.onItems(fresh);
-        idle = 0;
-      } else {
-        idle += 1;
-      }
+      // New photos, plus photos seen before without a thumbnail that now have one (Google loads
+      // images lazily, so the first reading of a tile can be empty).
+      let newIds = 0;
+      const fresh = this.deps.readItems().filter((i) => {
+        const had = this.seen.get(i.id);
+        if (had === undefined) newIds += 1;
+        return had === undefined || (!had && i.thumbUrl !== '');
+      });
+      for (const i of fresh) this.seen.set(i.id, i.thumbUrl !== '');
+      if (fresh.length > 0) this.deps.onItems(fresh);
+      idle = newIds > 0 ? 0 : idle + 1;
       this.deps.onProgress(this.seen.size, this.state);
 
       if (idle >= this.opts.maxIdleSteps) {

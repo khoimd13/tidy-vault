@@ -71,6 +71,35 @@ describe('Scanner', () => {
     await expect(done).resolves.toBe('cancelled');
   });
 
+  it('reports a photo again once its thumbnail has loaded', async () => {
+    const screens = [
+      [photo('a', { thumbUrl: '' })],
+      [photo('a', { thumbUrl: 'https://lh3.googleusercontent.com/a' }), photo('b')],
+      [photo('b')],
+    ];
+    let pos = 0;
+    const received: PhotoItem[] = [];
+    const scanner = new Scanner(
+      {
+        readItems: () => screens[Math.min(pos, screens.length - 1)] ?? [],
+        scrollStep: () => {
+          pos += 1;
+        },
+        sleep: () => Promise.resolve(),
+        onItems: (items) => received.push(...items),
+        onProgress: () => undefined,
+      },
+      opts,
+    );
+    await scanner.run();
+    expect(received.map((i) => [i.id, i.thumbUrl !== ''])).toEqual([
+      ['a', false],
+      ['a', true],
+      ['b', true],
+    ]);
+    expect(scanner.seenCount).toBe(2);
+  });
+
   it('refuses to run twice at the same time', async () => {
     const { deps } = fakePage([['a']]);
     const scanner = new Scanner(deps, { ...opts, maxIdleSteps: 100 });
