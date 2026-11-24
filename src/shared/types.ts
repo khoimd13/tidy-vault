@@ -51,6 +51,8 @@ export interface Suggestion {
   reasons: string[];
   /** See CategoryScore.relatedId. */
   relatedId?: string;
+  /** Other groups this photo is also suggested in (category ids). */
+  alsoIn?: string[];
 }
 
 export type DecisionKind = 'clutter' | 'keep';

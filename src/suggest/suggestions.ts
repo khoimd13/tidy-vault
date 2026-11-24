@@ -1,8 +1,12 @@
 import type { Classifier, Thresholds } from '../ml/classifier';
 import { DEFAULT_THRESHOLDS, toConfidence } from '../ml/classifier';
-import type { Confidence, Decision, PhotoItem, Suggestion } from '../shared/types';
+import type { CategoryScore, Confidence, Decision, PhotoItem, Suggestion } from '../shared/types';
 
-/** Best category per item, skipping anything the person already decided on. */
+/**
+ * One suggestion per (photo, category) that scores high enough, so a photo can appear in several
+ * groups; each copy lists the other groups in `alsoIn`. Photos the person already decided on are
+ * skipped (a decision in any group covers all of them).
+ */
 export function buildSuggestions(
   items: readonly PhotoItem[],
   classifier: Classifier,
@@ -13,23 +17,28 @@ export function buildSuggestions(
   const out: Suggestion[] = [];
   for (const item of items) {
     if (decisions.has(item.id)) continue;
-    const best = classifier
-      .score(item, now)
-      .reduce<ReturnType<Classifier['score']>[number] | null>(
-        (a, b) => (a === null || b.score > a.score ? b : a),
-        null,
-      );
-    if (!best) continue;
-    const confidence = toConfidence(best.score, thresholds);
-    if (!confidence) continue;
-    out.push({
-      item,
-      categoryId: best.categoryId,
-      score: best.score,
-      confidence,
-      reasons: best.reasons,
-      ...(best.relatedId ? { relatedId: best.relatedId } : {}),
+    // Strongest per category, then keep the ones confident enough to suggest.
+    const perCategory = new Map<string, CategoryScore>();
+    for (const s of classifier.score(item, now)) {
+      const prev = perCategory.get(s.categoryId);
+      if (!prev || s.score > prev.score) perCategory.set(s.categoryId, s);
+    }
+    const kept = [...perCategory.values()].flatMap((s) => {
+      const confidence = toConfidence(s.score, thresholds);
+      return confidence ? [{ s, confidence }] : [];
     });
+    for (const { s, confidence } of kept) {
+      const alsoIn = kept.map((k) => k.s.categoryId).filter((id) => id !== s.categoryId);
+      out.push({
+        item,
+        categoryId: s.categoryId,
+        score: s.score,
+        confidence,
+        reasons: s.reasons,
+        ...(s.relatedId ? { relatedId: s.relatedId } : {}),
+        ...(alsoIn.length ? { alsoIn } : {}),
+      });
+    }
   }
   return out;
 }

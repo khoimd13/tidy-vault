@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { measureQuality, poorQualityScore, qualityReason } from '../../src/ml/quality';
+import {
+  isEmptyImage,
+  measureQuality,
+  poorQualityScore,
+  qualityReason,
+} from '../../src/ml/quality';
 
 const W = 64;
 const H = 64;
@@ -88,5 +93,14 @@ describe('poorQualityScore and qualityReason (thresholds from real-image calibra
       H,
     );
     expect(qualityReason(dark)).toBe('Very dark');
+  });
+});
+
+describe('isEmptyImage', () => {
+  it('is true for blank, very dark and washed-out images only', () => {
+    expect(isEmptyImage({ sharpness: 0, brightness: 250, contrast: 1 })).toBe(true); // all white
+    expect(isEmptyImage({ sharpness: 2, brightness: 10, contrast: 3 })).toBe(true); // all black
+    expect(isEmptyImage({ sharpness: 3, brightness: 120, contrast: 50 })).toBe(false); // blurry
+    expect(isEmptyImage({ sharpness: 900, brightness: 240, contrast: 15 })).toBe(false); // web page
   });
 });

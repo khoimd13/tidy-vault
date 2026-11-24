@@ -26,12 +26,13 @@ describe('buildSuggestions', () => {
   });
   const items = ['a', 'b', 'c', 'd'].map((id) => photo(id));
 
-  it('keeps the best category per item and drops weak scores', () => {
+  it('suggests a photo in every group it scores high enough in, noting the others', () => {
     const out = buildSuggestions(items, classifier, new Map(), NOW);
-    expect(out.map((s) => [s.item.id, s.categoryId, s.confidence])).toEqual([
-      ['a', 'screenshots', 'high'],
-      ['b', 'shopping', 'medium'],
-      ['d', 'screenshots', 'high'],
+    expect(out.map((s) => [s.item.id, s.categoryId, s.confidence, s.alsoIn])).toEqual([
+      ['a', 'screenshots', 'high', undefined],
+      ['b', 'screenshots', 'low', ['shopping']],
+      ['b', 'shopping', 'medium', ['screenshots']],
+      ['d', 'screenshots', 'high', undefined],
     ]);
   });
 
@@ -41,7 +42,8 @@ describe('buildSuggestions', () => {
       ['d', { id: 'd', kind: 'clutter', categoryId: 'screenshots', at: 0 }],
     ]);
     const out = buildSuggestions(items, classifier, decisions, NOW);
-    expect(out.map((s) => s.item.id)).toEqual(['b']);
+    // 'b' is in two groups; 'a' (kept) and 'd' (added) are gone from all of them.
+    expect(out.map((s) => s.item.id)).toEqual(['b', 'b']);
   });
 });
 

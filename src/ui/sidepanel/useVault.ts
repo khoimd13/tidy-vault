@@ -4,6 +4,7 @@ import { heuristicClassifier, noSuggestions } from '../../ml/classifier';
 import { createClipClassifier } from '../../ml/clipClassifier';
 import { findNearDuplicates } from '../../ml/duplicates';
 import { buildFeedback, withFeedback } from '../../ml/feedback';
+import { isEmptyImage } from '../../ml/quality';
 import { isContentToPanel, type PanelToContent } from '../../shared/messages';
 import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '../../shared/types';
 import * as store from '../../store/db';
@@ -160,7 +161,8 @@ export function useVault() {
       findNearDuplicates(
         items.flatMap((i) => {
           const a = ai.embeddings.get(i.id);
-          return a && i.kind === 'photo'
+          // Empty images (blank, very dark) are handled as empty, not grouped as a "burst".
+          return a && i.kind === 'photo' && !(a.quality && isEmptyImage(a.quality))
             ? [
                 {
                   id: i.id,

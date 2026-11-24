@@ -1,7 +1,7 @@
 import type { CategoryScore } from '../shared/types';
 import { heuristicClassifier, type Classifier } from './classifier';
 import { duplicateScore, type DuplicateMatch } from './duplicates';
-import { poorQualityScore, qualityReason, type Quality } from './quality';
+import { isEmptyImage, poorQualityScore, qualityReason, type Quality } from './quality';
 import { ageScore, screenShapeScore } from './signals';
 import { zeroShot, type TextBank, type ZeroShotResult } from './zeroShot';
 
@@ -16,6 +16,8 @@ export interface Analysis {
 const MIN_CLUTTER = 0.3;
 /** Poor-quality score at which a photo the AI sees as a memory is still offered as "not sure". */
 const POOR_ENOUGH_ALONE = 0.9;
+/** Confidence for images with essentially nothing to see (blank, very dark, washed out). */
+const EMPTY_SCORE = 0.9;
 
 /**
  * Zero-shot results only depend on the embedding and the text bank, so they are cached across
@@ -71,6 +73,7 @@ export function createClipClassifier(
       const age = ageScore(item.takenAt, now);
       const poor = analysis.quality ? poorQualityScore(analysis.quality) : 0;
       const poorReason = analysis.quality ? qualityReason(analysis.quality) : null;
+      const empty = analysis.quality ? isEmptyImage(analysis.quality) : false;
       const dated = (reasons: string[]) => {
         if (item.takenAt && age > 0.3) reasons.push(`From ${item.takenAt.slice(0, 4)}`);
         return reasons.map(capitalize);
@@ -91,12 +94,23 @@ export function createClipClassifier(
         if (!poorWins && poorReason && poor >= 0.5) reasons.push(poorReason);
         if (shape === 1) reasons.push('Phone-screen shape');
         const categoryId = poorWins ? 'blurry' : best.categoryId;
-        out.push({ categoryId, score, reasons: dated(reasons) });
+        out.push({
+          categoryId,
+          score: empty ? Math.max(score, EMPTY_SCORE) : score,
+          reasons: dated(reasons),
+        });
       } else if (poor >= POOR_ENOUGH_ALONE && poorReason) {
-        out.push({ categoryId: 'blurry', score: 0.62, reasons: dated([poorReason]) });
+        // Empty images are clutter whatever the model thinks (High); a blurry photo that still
+        // shows something the model sees as a memory is only offered as "not sure" (Medium).
+        out.push({
+          categoryId: 'blurry',
+          score: empty ? EMPTY_SCORE : 0.62,
+          reasons: dated([poorReason]),
+        });
       }
 
-      const dup = duplicates.get(item.id);
+      // Empty images belong with the empty ones, never in a burst (a blank "kept" photo is useless).
+      const dup = empty ? undefined : duplicates.get(item.id);
       if (dup) {
         const apart = dup.minutesApart === null ? 'the same day' : `${dup.minutesApart} min apart`;
         out.push({

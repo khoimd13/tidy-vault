@@ -12,7 +12,8 @@ interface Props {
 }
 
 export function Home({ vault, onReview, onCleanup }: Props) {
-  const total = vault.groups.reduce((n, g) => n + g.suggestions.length, 0);
+  // A photo can be in several groups; count it once.
+  const total = new Set(vault.groups.flatMap((g) => g.suggestions.map((s) => s.item.id))).size;
   const hasData = vault.itemCount > 0 || vault.counts.clutter > 0 || vault.counts.kept > 0;
 
   return (

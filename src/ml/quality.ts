@@ -97,6 +97,16 @@ export function qualityReason(q: Quality, limits = QUALITY_LIMITS): string | nul
   return null;
 }
 
+/**
+ * True when there is essentially nothing to see (blank, very dark or washed out), as opposed to a
+ * blurry photo that still shows something. Empty images are clutter whatever the model thinks,
+ * and are never treated as near-duplicates of each other.
+ */
+export function isEmptyImage(q: Quality, limits = QUALITY_LIMITS): boolean {
+  const reason = qualityReason(q, limits);
+  return reason === 'Almost nothing visible' || reason === 'Very dark' || reason === 'Washed out';
+}
+
 function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
 }

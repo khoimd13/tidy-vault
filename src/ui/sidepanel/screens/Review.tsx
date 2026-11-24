@@ -181,7 +181,9 @@ function SuggestionTile({ s, name, on, onToggle }: TileProps) {
       <button
         class={`tile${on ? ' selected' : ''}`}
         aria-pressed={on}
-        title={s.reasons.join(' · ')}
+        title={[...s.reasons, ...(s.alsoIn ?? []).map((id) => `Also in ${groupName(id)}`)].join(
+          ' · ',
+        )}
         onClick={() => onToggle(s.item.id)}
       >
         <Thumb item={s.item} alt={`${name}, ${date}`} />
@@ -193,8 +195,13 @@ function SuggestionTile({ s, name, on, onToggle }: TileProps) {
         )}
       </button>
       <TileCaption item={s.item} />
+      {s.alsoIn && <span class="also">Also in: {s.alsoIn.map(groupName).join(', ')}</span>}
     </li>
   );
+}
+
+function groupName(id: string): string {
+  return categoryById(id)?.name ?? id;
 }
 
 function TileCaption({ item }: { item: PhotoItem }) {

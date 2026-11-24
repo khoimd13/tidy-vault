@@ -94,6 +94,21 @@ describe('createClipClassifier', () => {
     expect(s).toEqual({ categoryId: 'blurry', score: 0.62, reasons: ['Very blurry'] });
   });
 
+  it('files empty images as empty (High), never as near-duplicates', () => {
+    const blank = { sharpness: 0, brightness: 250, contrast: 1 };
+    const withBlank = new Map(analyses).set('blank', a(v(0, 0, 1, 0), blank));
+    const dups = new Map([
+      ['blank', { keepId: 'other-blank', similarity: 0.99, minutesApart: 0, groupSize: 2 }],
+    ]);
+    const scores = createClipClassifier(bank, withBlank, undefined, dups).score(
+      photo('blank', { takenAt: null }),
+      NOW,
+    );
+    expect(scores).toEqual([
+      { categoryId: 'blurry', score: 0.9, reasons: ['Almost nothing visible'] },
+    ]);
+  });
+
   it('suggests near-duplicates that are not the kept photo', () => {
     const dups = new Map([
       ['person', { keepId: 'other', similarity: 0.97, minutesApart: 1, groupSize: 2 }],
