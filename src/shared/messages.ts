@@ -8,7 +8,9 @@ export type PanelToContent =
   | { type: 'scan/resume' }
   | { type: 'scan/cancel' }
   /** Download thumbnails in the page, where the Google session applies. */
-  | { type: 'thumbs/fetch'; urls: string[] };
+  | { type: 'thumbs/fetch'; urls: string[] }
+  /** Create a new private album with these photos (the only write; never deletes anything). */
+  | { type: 'album/add'; name: string; mediaKeys: string[] };
 
 /** The content script's reply to every PanelToContent message. */
 export interface PanelResponse {
@@ -19,6 +21,10 @@ export interface PanelResponse {
   items?: PhotoItem[];
   /** Only on `thumbs/fetch`: a data: URL per requested URL, or null when it failed. */
   thumbs?: (string | null)[];
+  /** Only on `album/add`. */
+  album?:
+    | { ok: true; name: string; added: number; verifiedCount: number | null }
+    | { ok: false; error: string };
 }
 
 /** Messages the content script sends back to the side panel. */
@@ -35,6 +41,7 @@ const PANEL_TYPES = new Set<string>([
   'scan/resume',
   'scan/cancel',
   'thumbs/fetch',
+  'album/add',
 ]);
 const CONTENT_TYPES = new Set<string>(['scan/items', 'scan/progress', 'scan/done', 'scan/error']);
 

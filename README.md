@@ -4,7 +4,9 @@ A Chrome extension that **suggests** clutter in your Google Photos library: scre
 shopping pages and product ads, memes, receipts and documents, whiteboards and notes, blurry,
 dark or empty photos, accidental shots, and near-duplicate bursts. An AI
 model running on your own computer looks at each photo. You review the suggestions and decide.
-**It never deletes or changes anything in Google Photos.**
+**It never deletes anything.** The one optional write is the beta "to remove" album: one new
+private album with the photos you confirmed, so you can delete them from Google Photos in a few
+clicks.
 
 - Runs entirely on your computer: the AI model ships inside the extension. No servers, no
   analytics, nothing uploaded.
@@ -59,6 +61,9 @@ recognises screenshots by their shape.
 - **Near-duplicates:** photos taken within 10 minutes whose image vectors are at least 0.92
   similar form a group; the sharpest is kept and the rest are suggested. Calibrated on
   burst-like copies (`tests-model/duplicates.smoke.test.ts`: 99% caught).
+- **Learning from you:** photos nearly identical to ones you kept stop being suggested, similar
+  ones lose confidence, photos like ones you added gain a little, and a category whose
+  suggestions you mostly reject becomes more cautious.
 - **Caching:** image and text vectors are stored locally, so photos are analysed once and saved
   results show instantly next time.
 - **Measured** on 24 real screenshots and 26 real photos (`npm run test:model`): all screenshots
@@ -142,5 +147,6 @@ in the extension's own IndexedDB on this computer. **Clear local data** wipes th
 - Page reading was checked on the live site (Vietnamese UI, Nov 2026). Dates are read from
   English and Vietnamese labels; other languages show no dates yet.
 - The extension is about 230 MB because the model is bundled.
-- Opening a suggested photo works through its link; there is no bulk action in Google Photos yet
-  (the v1.5 "to remove" album is planned, see the docs).
+- The "to remove" album (beta) uses Google Photos' internal web calls (`OXvT9d` create album,
+  `E1Cajb` add, `snAcKc` read back; documented by Google Photos Toolkit). It can break when
+  Google changes its site; it then fails safely and the link list and CSV still work.

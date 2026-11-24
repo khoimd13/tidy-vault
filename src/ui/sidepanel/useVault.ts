@@ -10,7 +10,9 @@ import * as store from '../../store/db';
 import { buildCleanupList } from '../../suggest/cleanupList';
 import { buildSuggestions, groupSuggestions } from '../../suggest/suggestions';
 import {
+  addToNewAlbumViaTab,
   fetchThumbsViaTab,
+  type AlbumOutcome,
   findPhotosTabId,
   injectContentScript,
   sendToTab,
@@ -101,7 +103,7 @@ export function useVault() {
   }, [addItems]);
 
   const command = useCallback(
-    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch'>) => {
+    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add'>) => {
       if (tabId === null) return;
       const send = async () => {
         const res = await sendToTab(tabId, { type });
@@ -227,6 +229,19 @@ export function useVault() {
     });
   }, []);
 
+  /** Puts the given photos in a new private album in Google Photos (never deletes anything). */
+  const makeAlbum = useCallback(
+    async (name: string, ids: string[]): Promise<AlbumOutcome> => {
+      if (tabId === null) return { ok: false, error: 'Open Google Photos in this window first' };
+      try {
+        return await addToNewAlbumViaTab(tabId, name, ids);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    [tabId],
+  );
+
   const clearAll = useCallback(async () => {
     await store.clearAll();
     setItems([]);
@@ -262,6 +277,7 @@ export function useVault() {
     command,
     decide,
     restore,
+    makeAlbum,
     undo,
     clearAll,
   };

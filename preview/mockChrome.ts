@@ -134,6 +134,7 @@ function handle(msg: PanelToContent) {
       break;
     case 'ping':
     case 'thumbs/fetch':
+    case 'album/add':
       break;
   }
   return { ok: true, state, seen };
@@ -160,7 +161,14 @@ async function fetchAsDataUrls(urls: string[]): Promise<(string | null)[]> {
 
 async function respond(msg: PanelToContent) {
   const base = handle(msg);
-  return msg.type === 'thumbs/fetch' ? { ...base, thumbs: await fetchAsDataUrls(msg.urls) } : base;
+  if (msg.type === 'thumbs/fetch') return { ...base, thumbs: await fetchAsDataUrls(msg.urls) };
+  if (msg.type === 'album/add') {
+    // Pretend Google created the album (the preview never talks to Google).
+    await new Promise((r) => setTimeout(r, 1200));
+    const n = msg.mediaKeys.length;
+    return { ...base, album: { ok: true, name: msg.name, added: n, verifiedCount: n } };
+  }
+  return base;
 }
 
 const params = new URLSearchParams(location.search);

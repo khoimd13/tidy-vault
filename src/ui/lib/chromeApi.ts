@@ -57,3 +57,15 @@ export async function injectContentScript(tabId: number): Promise<void> {
   // Give the script a moment to load its module and start listening.
   await new Promise((resolve) => setTimeout(resolve, 300));
 }
+
+export type AlbumOutcome = NonNullable<PanelResponse['album']>;
+
+/** Asks the Google Photos tab to put these photos in a new private album. */
+export async function addToNewAlbumViaTab(
+  tabId: number,
+  name: string,
+  mediaKeys: string[],
+): Promise<AlbumOutcome> {
+  const res = await sendToTab(tabId, { type: 'album/add', name, mediaKeys });
+  return res.album ?? { ok: false, error: 'The Google Photos tab did not answer' };
+}

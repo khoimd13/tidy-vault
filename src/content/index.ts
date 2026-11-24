@@ -1,6 +1,7 @@
 /** Content script on photos.google.com: runs the scanner and streams results to the side panel. */
 import { fetchThumbnails, findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
+import { addPhotosToNewAlbum, readSession } from '../source/googlePhotosApi';
 import { isPanelToContent, type ContentToPanel, type PanelResponse } from '../shared/messages';
 import type { PhotoItem } from '../shared/types';
 
@@ -52,6 +53,23 @@ function status(): PanelResponse {
 if (!alreadyLoaded)
   chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
     if (!isPanelToContent(msg)) return;
+    if (msg.type === 'album/add') {
+      const scripts = Array.from(document.scripts, (s) => s.textContent ?? '');
+      void (async () => {
+        try {
+          const result = await addPhotosToNewAlbum(msg.name, msg.mediaKeys, {
+            fetcher: (url, init) => fetch(url, init),
+            session: readSession(scripts),
+            sourcePath: location.pathname,
+            sleep,
+          });
+          sendResponse({ ...status(), album: { ok: true, ...result } });
+        } catch (err) {
+          sendResponse({ ...status(), album: { ok: false, error: String(err) } });
+        }
+      })();
+      return true;
+    }
     if (msg.type === 'thumbs/fetch') {
       void fetchThumbnails(msg.urls).then((thumbs) => sendResponse({ ...status(), thumbs }));
       return true; // keeps the message channel open for the async reply
