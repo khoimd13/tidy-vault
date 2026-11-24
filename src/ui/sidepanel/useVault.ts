@@ -7,7 +7,8 @@ import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '.
 import * as store from '../../store/db';
 import { buildCleanupList } from '../../suggest/cleanupList';
 import { buildSuggestions, groupSuggestions } from '../../suggest/suggestions';
-import { findPhotosTabId, sendToTab } from '../lib/chromeApi';
+import { fetchThumbsViaTab, findPhotosTabId, sendToTab } from '../lib/chromeApi';
+import { clearThumbCache } from './components/Thumb';
 import { useAnalysis } from './useAnalysis';
 
 export interface ScanStatus {
@@ -91,7 +92,7 @@ export function useVault() {
   }, [addItems]);
 
   const command = useCallback(
-    async (type: PanelToContent['type']) => {
+    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch'>) => {
       if (tabId === null) return;
       try {
         const res = await sendToTab(tabId, { type });
@@ -114,7 +115,12 @@ export function useVault() {
     void command('ping');
   }, [tabId, tabLoads, command]);
 
-  const ai = useAnalysis(items);
+  // Thumbnails can only be downloaded through a connected Google Photos tab.
+  const fetchThumbs = useMemo(
+    () => (tabId === null ? null : (urls: string[]) => fetchThumbsViaTab(tabId, urls)),
+    [tabId],
+  );
+  const ai = useAnalysis(items, fetchThumbs);
 
   // With the AI: only analysed photos are suggested (they appear as analysis runs), so the cruder
   // shape rule never shows wrong suggestions that then disappear. Without it: shape rule only.
@@ -161,6 +167,7 @@ export function useVault() {
     setItems([]);
     setDecisions(new Map());
     ai.reset();
+    clearThumbCache();
   }, [ai.reset]);
 
   const counts = useMemo(() => {

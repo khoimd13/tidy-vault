@@ -133,9 +133,34 @@ function handle(msg: PanelToContent) {
       }
       break;
     case 'ping':
+    case 'thumbs/fetch':
       break;
   }
   return { ok: true, state, seen };
+}
+
+/** Like the content script: download each image and hand it back as a data: URL. */
+async function fetchAsDataUrls(urls: string[]): Promise<(string | null)[]> {
+  return Promise.all(
+    urls.map(async (url) => {
+      try {
+        const blob = await (await fetch(url)).blob();
+        return await new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    }),
+  );
+}
+
+async function respond(msg: PanelToContent) {
+  const base = handle(msg);
+  return msg.type === 'thumbs/fetch' ? { ...base, thumbs: await fetchAsDataUrls(msg.urls) } : base;
 }
 
 const params = new URLSearchParams(location.search);
@@ -149,7 +174,7 @@ const event = { addListener: noop, removeListener: noop };
   tabs: {
     query: () =>
       Promise.resolve([{ id: 1, url: onPhotos ? 'https://photos.google.com/' : 'https://x.y/' }]),
-    sendMessage: (_id: number, msg: PanelToContent) => Promise.resolve(handle(msg)),
+    sendMessage: (_id: number, msg: PanelToContent) => respond(msg),
     create: ({ url }: { url: string }) => {
       window.open(url, '_blank');
       return Promise.resolve({});

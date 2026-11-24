@@ -3,6 +3,7 @@ import { categoryById } from '../../../shared/categories';
 import type { Confidence, DecisionKind, Suggestion } from '../../../shared/types';
 import type { SuggestionGroup } from '../../../suggest/suggestions';
 import type { ToastApi } from '../components/Toast';
+import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
 
 const LABEL: Record<Confidence, string> = { high: 'High', medium: 'Medium', low: 'Low' };
@@ -154,7 +155,7 @@ function Section({ title, hint, items, name, selected, onToggle }: SectionProps)
                 title={s.reasons.join(' · ')}
                 onClick={() => onToggle(s.item.id)}
               >
-                <img src={s.item.thumbUrl} alt={`${name}, ${date}`} loading="lazy" />
+                <Thumb item={s.item} alt={`${name}, ${date}`} />
                 <span class={`chip ${s.confidence}`}>{LABEL[s.confidence]}</span>
                 {on && (
                   <span class="check" aria-hidden="true">

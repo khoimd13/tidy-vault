@@ -54,3 +54,13 @@ describe('getEmbeddingsByModel', () => {
     expect(byModel.has('other')).toBe(false);
   });
 });
+
+describe('thumbnail store', () => {
+  it('saves thumbnails by photo id and clears them with everything else', async () => {
+    await store.putThumbs([{ id: 'a', blob: new Blob(['x'], { type: 'image/jpeg' }) }]);
+    expect((await store.getThumb('a'))?.size).toBe(1);
+    expect(await store.getThumb('missing')).toBeNull();
+    await store.clearAll();
+    expect(await store.getThumb('a')).toBeNull();
+  });
+});

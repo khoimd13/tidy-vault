@@ -6,7 +6,9 @@ export type PanelToContent =
   | { type: 'scan/start' }
   | { type: 'scan/pause' }
   | { type: 'scan/resume' }
-  | { type: 'scan/cancel' };
+  | { type: 'scan/cancel' }
+  /** Download thumbnails in the page, where the Google session applies. */
+  | { type: 'thumbs/fetch'; urls: string[] };
 
 /** The content script's reply to every PanelToContent message. */
 export interface PanelResponse {
@@ -15,6 +17,8 @@ export interface PanelResponse {
   seen: number;
   /** Only on `ping`: everything found on the page so far, so a reopened panel can catch up. */
   items?: PhotoItem[];
+  /** Only on `thumbs/fetch`: a data: URL per requested URL, or null when it failed. */
+  thumbs?: (string | null)[];
 }
 
 /** Messages the content script sends back to the side panel. */
@@ -30,6 +34,7 @@ const PANEL_TYPES = new Set<string>([
   'scan/pause',
   'scan/resume',
   'scan/cancel',
+  'thumbs/fetch',
 ]);
 const CONTENT_TYPES = new Set<string>(['scan/items', 'scan/progress', 'scan/done', 'scan/error']);
 

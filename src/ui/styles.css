@@ -173,7 +173,9 @@ progress {
 }
 
 .strip img,
-.tile img {
+.tile img,
+.strip .thumb-placeholder,
+.tile .thumb-placeholder {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
@@ -368,4 +370,15 @@ details ol {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.thumb-placeholder {
+  display: block;
+}
+
+.list .thumb-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--border);
 }

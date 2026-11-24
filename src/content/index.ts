@@ -1,5 +1,5 @@
 /** Content script on photos.google.com: runs the scanner and streams results to the side panel. */
-import { findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
+import { fetchThumbnails, findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
 import { isPanelToContent, type ContentToPanel, type PanelResponse } from '../shared/messages';
 import type { PhotoItem } from '../shared/types';
@@ -40,8 +40,16 @@ function start(): void {
     .catch((err: unknown) => send({ type: 'scan/error', message: String(err) }));
 }
 
+function status(): PanelResponse {
+  return { ok: true, state: scanner?.status ?? 'idle', seen: scanner?.seenCount ?? 0 };
+}
+
 chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
   if (!isPanelToContent(msg)) return;
+  if (msg.type === 'thumbs/fetch') {
+    void fetchThumbnails(msg.urls).then((thumbs) => sendResponse({ ...status(), thumbs }));
+    return true; // keeps the message channel open for the async reply
+  }
   switch (msg.type) {
     case 'ping':
       break;
@@ -58,11 +66,5 @@ chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
       scanner?.cancel();
       break;
   }
-  const response: PanelResponse = {
-    ok: true,
-    state: scanner?.status ?? 'idle',
-    seen: scanner?.seenCount ?? 0,
-    ...(msg.type === 'ping' ? { items: [...found.values()] } : {}),
-  };
-  sendResponse(response);
+  sendResponse({ ...status(), ...(msg.type === 'ping' ? { items: [...found.values()] } : {}) });
 });

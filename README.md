@@ -119,20 +119,20 @@ Two rules are enforced by ESLint so the structure stays easy to maintain:
 
 - `sidePanel`, `storage`.
 - `photos.google.com`: to read the photo grid you are looking at.
-- `*.googleusercontent.com`: where Google serves photo thumbnails. The side panel downloads the
-  small thumbnails so the on-device AI can look at them. Nothing is uploaded anywhere.
+- No image-server permission: Google's thumbnails only load with your Google session, so the
+  part of Vault Tidy running inside the Google Photos tab downloads the small (224 px)
+  thumbnails and hands them to the side panel. Nothing is uploaded anywhere.
 - Content Security Policy allows WebAssembly (`wasm-unsafe-eval`) for the bundled AI runtime.
   No code or model is ever loaded from the internet at runtime.
 
-Scanned items (id, link, date, thumbnail link, shape), AI vectors and your decisions are stored
+Scanned items (id, link, date, thumbnail link, shape), small thumbnails (about 10 KB each), AI
+vectors and your decisions are stored
 in the extension's own IndexedDB on this computer. **Clear local data** wipes them.
 
 ## Known limits
 
-- Page selectors and English date parsing in `googlePhotosDom.ts` are best-effort and still need
-  checking against the live site. Non-English Google Photos shows no dates yet.
-- Thumbnails are fetched with your Google session from the extension; this needs checking on the
-  live site too.
+- Page reading was checked on the live site (Vietnamese UI, Nov 2026). Dates are read from
+  English and Vietnamese labels; other languages show no dates yet.
 - The extension is about 230 MB because the model is bundled.
 - Opening a suggested photo works through its link; there is no bulk action in Google Photos yet
   (the v1.5 "to remove" album is planned, see the docs).

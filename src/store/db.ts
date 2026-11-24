@@ -13,10 +13,12 @@ interface VaultSchema extends DBSchema {
   items: { key: string; value: PhotoItem };
   decisions: { key: string; value: Decision };
   embeddings: { key: string; value: StoredEmbedding };
+  /** Small thumbnails (fetched through the Google Photos tab), so screens can show them. */
+  thumbs: { key: string; value: { id: string; blob: Blob } };
 }
 
 const DB_NAME = 'vault-tidy';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<VaultSchema>> | null = null;
 
@@ -28,6 +30,7 @@ function db(): Promise<IDBPDatabase<VaultSchema>> {
         database.createObjectStore('decisions', { keyPath: 'id' });
       }
       if (oldVersion < 2) database.createObjectStore('embeddings', { keyPath: 'id' });
+      if (oldVersion < 3) database.createObjectStore('thumbs', { keyPath: 'id' });
     },
   });
   return dbPromise;
@@ -79,11 +82,22 @@ export async function getEmbeddingsByModel(
   return out;
 }
 
+export async function putThumbs(list: readonly { id: string; blob: Blob }[]): Promise<void> {
+  if (list.length === 0) return;
+  const tx = (await db()).transaction('thumbs', 'readwrite');
+  await Promise.all([...list.map((t) => tx.store.put(t)), tx.done]);
+}
+
+export async function getThumb(id: string): Promise<Blob | null> {
+  return (await (await db()).get('thumbs', id))?.blob ?? null;
+}
+
 export async function clearAll(): Promise<void> {
   const database = await db();
   await Promise.all([
     database.clear('items'),
     database.clear('decisions'),
     database.clear('embeddings'),
+    database.clear('thumbs'),
   ]);
 }

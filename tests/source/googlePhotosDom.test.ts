@@ -39,7 +39,7 @@ describe('parseLabelDate', () => {
     expect(parseLabelDate('Video - Landscape - Sept. 12, 2019')).toBe('2019-09-12');
   });
   it('returns null when no date is present', () => {
-    expect(parseLabelDate('Ảnh - 3 thg 3, 2022')).toBeNull();
+    expect(parseLabelDate('Ảnh – Dọc')).toBeNull();
   });
 });
 
@@ -100,5 +100,36 @@ describe('thumbnail lookup in real-world tile layouts', () => {
       // No thumbnail of its own: it must not borrow a neighbour's.
       ['THREE', ''],
     ]);
+  });
+});
+
+describe('live-site formats (Nov 2026)', () => {
+  it('accepts the new image host and keeps the authuser query when resizing', () => {
+    expect(
+      toSizedThumb('https://photos.fife.usercontent.google.com/pw/ABC=w90-h200-no?authuser=0'),
+    ).toBe('https://photos.fife.usercontent.google.com/pw/ABC=w224-h224?authuser=0');
+  });
+
+  it('reads Vietnamese labels', () => {
+    expect(parseLabelDate('Ảnh – Dọc – 19:38:50 24 thg 11, 2024')).toBe('2024-11-24');
+    expect(parseLabelDate('Ảnh – Ngang – 3 thg 1, 2021')).toBe('2021-01-03');
+  });
+
+  it('reads a real tile: thumbnail in a child div of the link', () => {
+    document.body.innerHTML = `
+      <div class="rtIMgb">
+        <a class="p137Zd" href="./photo/AF1Qip" aria-label="Ảnh – Dọc – 19:38:50 24 thg 11, 2024">
+          <div class="RY3tic"
+            style="background-image: url(&quot;https://photos.fife.usercontent.google.com/pw/X=w90-h200-no?authuser=0&quot;);"
+            data-latest-bg="https://photos.fife.usercontent.google.com/pw/X=w90-h200-no?authuser=0"></div>
+        </a>
+      </div>`;
+    const [item] = readVisibleItems(document, 'https://photos.google.com');
+    expect(item).toMatchObject({
+      id: 'AF1Qip',
+      thumbUrl: 'https://photos.fife.usercontent.google.com/pw/X=w224-h224?authuser=0',
+      takenAt: '2024-11-24',
+      kind: 'photo',
+    });
   });
 });

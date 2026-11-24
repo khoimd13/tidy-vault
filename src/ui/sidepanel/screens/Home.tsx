@@ -2,6 +2,7 @@ import { categoryById } from '../../../shared/categories';
 import type { SuggestionGroup } from '../../../suggest/suggestions';
 import { openGooglePhotos } from '../../lib/chromeApi';
 import { formatSpan } from '../../lib/format';
+import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
 
 interface Props {
@@ -147,7 +148,7 @@ function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () =
       {group.span && <p class="muted">{formatSpan(group.span)}</p>}
       <div class="strip" aria-hidden="true">
         {group.samples.map((s) => (
-          <img key={s.item.id} src={s.item.thumbUrl} alt="" loading="lazy" />
+          <Thumb key={s.item.id} item={s.item} />
         ))}
       </div>
       {group.topReason && <p class="muted">Why: {group.topReason.toLowerCase()}</p>}

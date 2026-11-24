@@ -3,6 +3,7 @@ import { categoryById } from '../../../shared/categories';
 import { toCsv } from '../../../suggest/cleanupList';
 import { downloadText } from '../../lib/download';
 import type { ToastApi } from '../components/Toast';
+import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
 
 interface Props {
@@ -64,7 +65,7 @@ export function Cleanup({ vault, toast, onBack }: Props) {
               <ul class="list">
                 {entries.map(({ item, decision }) => (
                   <li key={item.id} class="row">
-                    <img src={item.thumbUrl} alt="" loading="lazy" />
+                    <Thumb item={item} />
                     <a href={item.url} target="_blank" rel="noreferrer">
                       {item.takenAt ?? 'Unknown date'} ↗
                     </a>

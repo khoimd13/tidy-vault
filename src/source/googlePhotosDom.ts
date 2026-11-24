@@ -2,7 +2,11 @@
  * The ONLY module that knows how the Google Photos web page is built.
  * When Google changes its markup, fix it here and in tests/source/googlePhotosDom.test.ts.
  *
- * Selectors below are best-effort and must be re-checked against the live site.
+ * Checked against the live site (Nov 2026): each tile is `a[href="./photo/<id>"]` with an
+ * aria-label like "Ảnh – Dọc – 19:38:50 24 thg 11, 2024" or "Photo - Portrait - Mar 3, 2022", and a
+ * child div carrying the thumbnail in `style="background-image:url(…)"` and `data-latest-bg`.
+ * Thumbnails come from photos.fife.usercontent.google.com (older: lh3.googleusercontent.com) as
+ * `/pw/<id>=w90-h200-no?authuser=0` and only load with the signed-in Google session.
  */
 import type { PhotoItem } from '../shared/types';
 
@@ -14,34 +18,62 @@ export function parsePhotoId(href: string): string | null {
   return m?.[1] ?? null;
 }
 
-/** googleusercontent URLs carry size options after a trailing "=", e.g. `...=w256-h171-no`. */
-export function toSizedThumb(src: string, size = THUMB_SIZE): string {
-  if (!src) return '';
-  return `${src.replace(/=[^/=]*$/, '')}=w${size}-h${size}`;
+/** Google's photo image servers. */
+const THUMB_HOST = /(^|\.)(googleusercontent\.com|usercontent\.google\.com)$/;
+
+export function isGoogleImageUrl(src: string): boolean {
+  try {
+    const url = new URL(src);
+    return url.protocol === 'https:' && THUMB_HOST.test(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
-const MONTH_DATE = /([A-Z][a-z]{2,8})\.? (\d{1,2}), (\d{4})/;
+/**
+ * Image URLs carry size options after the last "=" in the path (`/pw/<id>=w90-h200-no`), sometimes
+ * followed by a query such as `?authuser=0`, which must be kept.
+ */
+export function toSizedThumb(src: string, size = THUMB_SIZE): string {
+  if (!src) return '';
+  try {
+    const url = new URL(src);
+    url.pathname = `${url.pathname.replace(/=[^/=]*$/, '')}=w${size}-h${size}`;
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
 
-/** Reads an English date like "Mar 3, 2022" from a tile label. Returns yyyy-mm-dd or null. */
+const EN_DATE = /([A-Z][a-z]{2,8})\.? (\d{1,2}), (\d{4})/;
+/** Vietnamese: "24 thg 11, 2024" (day, "thg" = month, month number, year). */
+const VI_DATE = /(\d{1,2}) thg (\d{1,2}),? (\d{4})/;
+
+function isoDate(y: number, m: number, d: number): string | null {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Reads the date from a tile label (English or Vietnamese). Returns yyyy-mm-dd or null. */
 export function parseLabelDate(label: string): string | null {
-  const m = MONTH_DATE.exec(label);
-  if (!m) return null;
-  const t = Date.parse(`${m[1]} ${m[2]}, ${m[3]} 12:00 UTC`);
+  const vi = VI_DATE.exec(label);
+  if (vi) return isoDate(Number(vi[3]), Number(vi[2]), Number(vi[1]));
+  const en = EN_DATE.exec(label);
+  if (!en) return null;
+  const t = Date.parse(`${en[1]} ${en[2]}, ${en[3]} 12:00 UTC`);
   if (Number.isNaN(t)) return null;
   return new Date(t).toISOString().slice(0, 10);
 }
 
-const THUMB_HOST = 'googleusercontent.com';
-
 /** A thumbnail URL carried by this one element, if any. */
 function thumbOf(el: Element): string {
   const latest = el.getAttribute('data-latest-bg');
-  if (latest?.includes(THUMB_HOST)) return latest;
+  if (latest && isGoogleImageUrl(latest)) return latest;
   const src = el.getAttribute('src');
-  if (el.tagName === 'IMG' && src?.includes(THUMB_HOST)) return src;
+  if (el.tagName === 'IMG' && src && isGoogleImageUrl(src)) return src;
   if (el instanceof HTMLElement) {
     const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage);
-    if (m?.[1]?.includes(THUMB_HOST)) return m[1];
+    if (m?.[1] && isGoogleImageUrl(m[1])) return m[1];
   }
   return '';
 }
@@ -56,9 +88,8 @@ function thumbInSubtree(root: Element): string {
 }
 
 /**
- * The thumbnail is usually not inside the photo link but next to it, in the same tile wrapper.
- * Search the link, then each wrapper above it, stopping before a wrapper that also holds another
- * photo (so a neighbour's thumbnail is never picked up).
+ * Search the link (where Google puts the thumbnail today), then each wrapper above it, stopping
+ * before a wrapper that also holds another photo, so a neighbour's thumbnail is never picked up.
  */
 function findThumb(tile: Element): string {
   let scope: Element | null = tile;
@@ -75,12 +106,11 @@ function findThumb(tile: Element): string {
 /** Background image from CSS (classes or inline), as the browser computed it. */
 function computedThumb(el: Element): string {
   const m = /url\(["']?(.*?)["']?\)/.exec(getComputedStyle(el).backgroundImage);
-  return m?.[1]?.includes(THUMB_HOST) ? m[1] : '';
+  return m?.[1] && isGoogleImageUrl(m[1]) ? m[1] : '';
 }
 
 /**
- * Layout-independent fallback: ask the browser what is drawn at the centre of the tile. Works
- * when the link is a transparent layer above an image that lives elsewhere in the page. Only
+ * Layout-independent fallback: ask the browser what is drawn at the centre of the tile. Only
  * possible for tiles currently on screen; the scanner re-reads tiles until they have a thumbnail.
  */
 function thumbUnder(tile: Element): string {
@@ -99,16 +129,6 @@ function thumbUnder(tile: Element): string {
   return '';
 }
 
-/** Only https images from Google's image servers are passed on to the panel. */
-function safeImageUrl(src: string): string {
-  try {
-    const url = new URL(src);
-    return url.protocol === 'https:' && url.hostname.endsWith('.googleusercontent.com') ? src : '';
-  } catch {
-    return '';
-  }
-}
-
 export function readTile(tile: HTMLAnchorElement, origin: string): PhotoItem | null {
   const href = tile.getAttribute('href') ?? '';
   const id = parsePhotoId(href);
@@ -119,10 +139,10 @@ export function readTile(tile: HTMLAnchorElement, origin: string): PhotoItem | n
     id,
     // Rebuilt from the id (not the raw href) so the panel only ever links to a plain photo page.
     url: `${origin}/photo/${id}`,
-    thumbUrl: toSizedThumb(safeImageUrl(findThumb(tile))),
+    thumbUrl: toSizedThumb(findThumb(tile)),
     takenAt: parseLabelDate(label),
     aspect: rect.width > 0 && rect.height > 0 ? rect.width / rect.height : null,
-    kind: /^video\b/i.test(label) ? 'video' : 'photo',
+    kind: /^video\b/i.test(label.trim()) ? 'video' : 'photo',
     label,
   };
 }
@@ -140,13 +160,49 @@ export function readVisibleItems(
   return items;
 }
 
-/** The element that scrolls the photo grid (Google Photos uses an inner scroller). */
+/**
+ * The element that scrolls the photo grid. Google Photos uses an inner scroller (a `c-wiz`), and
+ * the first photo link on the page can sit outside it, so pick the scrollable element that holds
+ * photo tiles and has the most to scroll.
+ */
 export function findScrollContainer(doc: Document = document): Element {
-  let el = doc.querySelector(PHOTO_LINK)?.parentElement ?? null;
-  while (el) {
-    const overflowY = getComputedStyle(el).overflowY;
-    if (/(auto|scroll)/.test(overflowY) && el.scrollHeight > el.clientHeight) return el;
-    el = el.parentElement;
+  let best: Element | null = null;
+  let bestHeight = 0;
+  for (const el of Array.from(doc.querySelectorAll('*'))) {
+    if (el.scrollHeight <= el.clientHeight + 50 || el.scrollHeight <= bestHeight) continue;
+    if (!/(auto|scroll)/.test(getComputedStyle(el).overflowY)) continue;
+    if (!el.querySelector(PHOTO_LINK)) continue;
+    best = el;
+    bestHeight = el.scrollHeight;
   }
-  return doc.scrollingElement ?? doc.documentElement;
+  return best ?? doc.scrollingElement ?? doc.documentElement;
+}
+
+/**
+ * Downloads thumbnails from the page, where the Google session applies (they return 403
+ * without it). Returns data: URLs so they can cross to the side panel; null for failures.
+ */
+export async function fetchThumbnails(urls: readonly string[]): Promise<(string | null)[]> {
+  return Promise.all(
+    urls.map(async (url) => {
+      if (!isGoogleImageUrl(url)) return null;
+      try {
+        const res = await fetch(url, {
+          credentials: 'include',
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        if (!blob.type.startsWith('image/')) return null;
+        return await new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    }),
+  );
 }

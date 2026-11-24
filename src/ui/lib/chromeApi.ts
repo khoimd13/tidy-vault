@@ -25,3 +25,23 @@ export async function getFlag(key: string): Promise<boolean> {
 export async function setFlag(key: string, value: boolean): Promise<void> {
   await chrome.storage.local.set({ [key]: value });
 }
+
+/**
+ * Downloads thumbnails through the Google Photos tab (they need the Google session, which the
+ * page has). Returns a Blob per URL, or null for ones that failed. Throws if the tab is gone.
+ */
+export async function fetchThumbsViaTab(tabId: number, urls: string[]): Promise<(Blob | null)[]> {
+  const res = await sendToTab(tabId, { type: 'thumbs/fetch', urls });
+  const thumbs = res.thumbs ?? [];
+  return Promise.all(
+    urls.map(async (_, i) => {
+      const dataUrl = thumbs[i];
+      if (!dataUrl?.startsWith('data:image/')) return null;
+      try {
+        return await (await fetch(dataUrl)).blob();
+      } catch {
+        return null;
+      }
+    }),
+  );
+}

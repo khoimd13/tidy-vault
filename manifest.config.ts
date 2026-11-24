@@ -16,10 +16,10 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  // Keep this list minimal. googleusercontent.com is where Google serves photo thumbnails; the
-  // side panel only fetches them (read-only) so the on-device AI can look at them.
+  // Keep this list minimal. Thumbnails are downloaded by the content script inside the Google
+  // Photos tab (they need the Google session), so no image-server permission is needed.
   permissions: ['sidePanel', 'storage'],
-  host_permissions: ['https://photos.google.com/*', 'https://*.googleusercontent.com/*'],
+  host_permissions: ['https://photos.google.com/*'],
   // The AI runtime is WebAssembly bundled with the extension; nothing remote is ever executed.
   content_security_policy: {
     extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",

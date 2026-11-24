@@ -15,7 +15,6 @@ const MODEL_KEY = `${CLIP_MODEL_ID}:q8`;
 /** Text prompt vectors are stored under their own key (id = the prompt text). */
 const TEXT_KEY = `${MODEL_KEY}:text`;
 const BATCH = 8;
-const FETCH_TIMEOUT_MS = 15_000;
 /** Re-render at most this often while analysing; every batch re-scores the whole library. */
 const COMMIT_EVERY_MS = 700;
 /** Give up after this many failed batches in a row (each one restarts the worker first). */
@@ -26,22 +25,17 @@ export type AiStatus =
   | { state: 'ready'; device: string }
   | { state: 'unavailable'; message: string };
 
-async function fetchThumb(url: string): Promise<Blob | null> {
-  try {
-    const res = await fetch(url, {
-      credentials: 'include',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    return res.ok ? await res.blob() : null;
-  } catch {
-    return null;
-  }
-}
+/** Downloads thumbnails; null entries are failures. Throws if downloading isn't possible now. */
+export type ThumbFetcher = (urls: string[]) => Promise<(Blob | null)[]>;
 
 const analysable = (i: PhotoItem) => i.kind === 'photo' && i.thumbUrl !== '';
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-export function useAnalysis(items: PhotoItem[]) {
+/**
+ * @param fetchThumbs downloads thumbnails through the Google Photos tab, or null while no such
+ *   tab is connected (analysis then waits instead of marking photos as failed).
+ */
+export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null) {
   const [status, setStatus] = useState<AiStatus>({ state: 'loading' });
   const [bank, setBank] = useState<TextBank | null>(null);
   const [embeddings, setEmbeddings] = useState<Map<string, Float32Array>>(new Map());
@@ -112,7 +106,7 @@ export function useAnalysis(items: PhotoItem[]) {
 
   // Analyse photos that have no vector yet. One loop at a time; it picks up new items as it goes.
   useEffect(() => {
-    if (status.state !== 'ready' || running.current) return;
+    if (status.state !== 'ready' || running.current || !fetchThumbs) return;
     running.current = true;
     void (async () => {
       let failedBatches = 0;
@@ -130,7 +124,12 @@ export function useAnalysis(items: PhotoItem[]) {
             .slice(0, BATCH);
           if (todo.length === 0) break;
 
-          const blobs = await Promise.all(todo.map((i) => fetchThumb(i.thumbUrl)));
+          let blobs: (Blob | null)[];
+          try {
+            blobs = await fetchThumbs(todo.map((i) => i.thumbUrl));
+          } catch {
+            break; // The Google Photos tab went away; resume when it's back.
+          }
           const ready = todo.filter((_, k) => blobs[k] !== null);
           let vectors: (Float32Array | null)[] = [];
           try {
@@ -163,6 +162,12 @@ export function useAnalysis(items: PhotoItem[]) {
           });
           embRef.current = next;
           void store.putEmbeddings(toSave);
+          void store.putThumbs(
+            todo.flatMap((item, k) => {
+              const blob = blobs[k];
+              return blob && next.has(item.id) ? [{ id: item.id, blob }] : [];
+            }),
+          );
           if (Date.now() - lastPublish >= COMMIT_EVERY_MS) {
             publish();
             lastPublish = Date.now();
@@ -176,7 +181,7 @@ export function useAnalysis(items: PhotoItem[]) {
         if (alive.current) publish();
       }
     })();
-  }, [status, items, publish]);
+  }, [status, items, publish, fetchThumbs]);
 
   const reset = useCallback(() => {
     generation.current += 1;
