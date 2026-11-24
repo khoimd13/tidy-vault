@@ -30,6 +30,14 @@
   box-sizing: border-box;
 }
 
+/* Set sizes on the page itself, not only :root, so nothing the browser adds can resize them. */
+html,
+body {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -234,7 +242,15 @@ progress {
   padding-left: 18px;
 }
 
+/* Footer text: explicitly small, on every element, so it never outgrows the content above it. */
+.footer,
+.footer span,
+.footer button {
+  font-size: 12px;
+}
+
 .footer {
+  align-items: baseline;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -381,4 +397,24 @@ details ol {
   height: 40px;
   border-radius: 6px;
   background: var(--border);
+}
+
+.burst {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tile.kept {
+  outline: 2px dashed var(--muted);
+  outline-offset: 1px;
+  cursor: default;
+}
+
+.chip.kept-chip {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--muted);
 }

@@ -28,6 +28,7 @@ export function buildSuggestions(
       score: best.score,
       confidence,
       reasons: best.reasons,
+      ...(best.relatedId ? { relatedId: best.relatedId } : {}),
     });
   }
   return out;

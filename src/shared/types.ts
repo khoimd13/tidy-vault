@@ -39,6 +39,8 @@ export interface CategoryScore {
   score: number;
   /** Short human reasons, strongest first. */
   reasons: string[];
+  /** Another photo this one relates to, e.g. the kept photo of a near-duplicate burst. */
+  relatedId?: string;
 }
 
 export interface Suggestion {
@@ -47,6 +49,8 @@ export interface Suggestion {
   score: number;
   confidence: Confidence;
   reasons: string[];
+  /** See CategoryScore.relatedId. */
+  relatedId?: string;
 }
 
 export type DecisionKind = 'clutter' | 'keep';

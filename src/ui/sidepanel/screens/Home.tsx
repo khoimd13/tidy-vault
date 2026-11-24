@@ -227,6 +227,8 @@ function AiLine({ vault }: { vault: Vault }) {
     <p class="ai muted">
       AI analysed {progress.done.toLocaleString()} photos on this computer
       {progress.failed > 0 && ` (${progress.failed.toLocaleString()} couldn't be loaded)`}.
+      {vault.learnedFrom > 0 &&
+        ` Suggestions are tuned by your ${vault.learnedFrom.toLocaleString()} choices.`}
     </p>
   );
 }

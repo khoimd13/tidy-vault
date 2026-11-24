@@ -103,6 +103,7 @@ export function createClipClassifier(
           categoryId: 'duplicates',
           score: duplicateScore(dup.similarity),
           reasons: dated([`Very similar to a photo taken ${apart}`, 'Keeping the sharpest']),
+          relatedId: dup.keepId,
         });
       }
       return out;

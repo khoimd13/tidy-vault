@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { heuristicClassifier, noSuggestions } from '../../ml/classifier';
 import { createClipClassifier } from '../../ml/clipClassifier';
 import { findNearDuplicates } from '../../ml/duplicates';
+import { buildFeedback, withFeedback } from '../../ml/feedback';
 import { isContentToPanel, type PanelToContent } from '../../shared/messages';
 import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '../../shared/types';
 import * as store from '../../store/db';
@@ -173,12 +174,26 @@ export function useVault() {
     [items, ai.embeddings],
   );
 
+  // Learning from Keep / Add decisions. Rebuilt only when decisions change or a decided photo gets
+  // its vector, not on every analysis batch.
+  const decidedWithVectors = useMemo(() => {
+    let n = 0;
+    for (const id of decisions.keys()) if (ai.embeddings.has(id)) n += 1;
+    return n;
+  }, [decisions, ai.embeddings]);
+  const feedback = useMemo(
+    () => buildFeedback(decisions, ai.embeddings),
+    // ai.embeddings is read but deliberately not a dependency: only the count above matters.
+    [decisions, decidedWithVectors],
+  );
+
   const classifier = useMemo(() => {
     const unanalysed = ai.status.state === 'unavailable' ? heuristicClassifier : noSuggestions;
-    return ai.bank
+    const base = ai.bank
       ? createClipClassifier(ai.bank, ai.embeddings, unanalysed, duplicates)
       : unanalysed;
-  }, [ai.status.state, ai.bank, ai.embeddings, duplicates]);
+    return withFeedback(base, feedback, ai.embeddings);
+  }, [ai.status.state, ai.bank, ai.embeddings, duplicates, feedback]);
 
   const groups = useMemo(
     () => groupSuggestions(buildSuggestions(items, classifier, decisions, new Date())),
@@ -231,12 +246,15 @@ export function useVault() {
   }, [decisions]);
 
   const cleanup = useMemo(() => buildCleanupList(items, decisions), [items, decisions]);
+  const itemsById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   return {
     onPhotos: tabId !== null,
     scan,
     ai: { status: ai.status, progress: ai.progress },
+    learnedFrom: feedback.decisions,
     itemCount: items.length,
+    itemsById,
     groups,
     cleanup,
     counts,

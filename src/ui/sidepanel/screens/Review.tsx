@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { categoryById } from '../../../shared/categories';
-import type { Confidence, DecisionKind, Suggestion } from '../../../shared/types';
+import type { Confidence, DecisionKind, PhotoItem, Suggestion } from '../../../shared/types';
 import type { SuggestionGroup } from '../../../suggest/suggestions';
 import type { ToastApi } from '../components/Toast';
 import { Thumb } from '../components/Thumb';
@@ -99,7 +99,16 @@ export function Review({ vault, toast, categoryId, group, onBack }: Props) {
             </span>
           </div>
 
-          {likely.length > 0 && (
+          {categoryId === 'duplicates' && (
+            <Bursts
+              suggestions={suggestions}
+              keptById={vault.itemsById}
+              name={name}
+              selected={selected}
+              onToggle={toggle}
+            />
+          )}
+          {categoryId !== 'duplicates' && likely.length > 0 && (
             <Section
               title={`Likely clutter (${likely.length})`}
               hint={
@@ -113,7 +122,7 @@ export function Review({ vault, toast, categoryId, group, onBack }: Props) {
               onToggle={toggle}
             />
           )}
-          {unsure.length > 0 && (
+          {categoryId !== 'duplicates' && unsure.length > 0 && (
             <Section
               title={`Not sure (${unsure.length})`}
               hint="Tap the ones that are clutter."
@@ -144,41 +153,114 @@ function Section({ title, hint, items, name, selected, onToggle }: SectionProps)
       <h3>{title}</h3>
       <p class="muted">{hint}</p>
       <ul class="grid">
-        {items.map((s) => {
-          const on = selected.has(s.item.id);
-          const date = s.item.takenAt ?? 'Unknown date';
-          return (
-            <li key={s.item.id} class="cell">
-              <button
-                class={`tile${on ? ' selected' : ''}`}
-                aria-pressed={on}
-                title={s.reasons.join(' · ')}
-                onClick={() => onToggle(s.item.id)}
-              >
-                <Thumb item={s.item} alt={`${name}, ${date}`} />
-                <span class={`chip ${s.confidence}`}>{LABEL[s.confidence]}</span>
-                {on && (
-                  <span class="check" aria-hidden="true">
-                    ✓
-                  </span>
-                )}
-              </button>
-              <div class="caption">
-                <span class="muted">{s.item.takenAt?.slice(0, 7) ?? '—'}</span>
-                <a
-                  href={s.item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open in Google Photos, ${date}`}
-                  title="Open in Google Photos"
-                >
-                  ↗
-                </a>
-              </div>
-            </li>
-          );
-        })}
+        {items.map((s) => (
+          <SuggestionTile
+            key={s.item.id}
+            s={s}
+            name={name}
+            on={selected.has(s.item.id)}
+            onToggle={onToggle}
+          />
+        ))}
       </ul>
+    </section>
+  );
+}
+
+interface TileProps {
+  s: Suggestion;
+  name: string;
+  on: boolean;
+  onToggle: (id: string) => void;
+}
+
+function SuggestionTile({ s, name, on, onToggle }: TileProps) {
+  const date = s.item.takenAt ?? 'Unknown date';
+  return (
+    <li class="cell">
+      <button
+        class={`tile${on ? ' selected' : ''}`}
+        aria-pressed={on}
+        title={s.reasons.join(' · ')}
+        onClick={() => onToggle(s.item.id)}
+      >
+        <Thumb item={s.item} alt={`${name}, ${date}`} />
+        <span class={`chip ${s.confidence}`}>{LABEL[s.confidence]}</span>
+        {on && (
+          <span class="check" aria-hidden="true">
+            ✓
+          </span>
+        )}
+      </button>
+      <TileCaption item={s.item} />
+    </li>
+  );
+}
+
+function TileCaption({ item }: { item: PhotoItem }) {
+  const date = item.takenAt ?? 'Unknown date';
+  return (
+    <div class="caption">
+      <span class="muted">{item.takenAt?.slice(0, 7) ?? '—'}</span>
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Open in Google Photos, ${date}`}
+        title="Open in Google Photos"
+      >
+        ↗
+      </a>
+    </div>
+  );
+}
+
+interface BurstsProps {
+  suggestions: Suggestion[];
+  keptById: ReadonlyMap<string, PhotoItem>;
+  name: string;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+}
+
+/** Near-duplicates, one row per burst: the photo that stays first, then the ones that would go. */
+function Bursts({ suggestions, keptById, name, selected, onToggle }: BurstsProps) {
+  const bursts = new Map<string, Suggestion[]>();
+  for (const s of suggestions) {
+    const key = s.relatedId ?? s.item.id;
+    bursts.set(key, [...(bursts.get(key) ?? []), s]);
+  }
+  return (
+    <section class="stack">
+      <p class="muted">
+        Each row is one burst. The sharpest photo stays; the others are selected to go. Tap any you
+        want to keep.
+      </p>
+      {[...bursts].map(([keptId, members]) => {
+        const kept = keptById.get(keptId);
+        return (
+          <ul key={keptId} class="grid burst">
+            {kept && (
+              <li class="cell">
+                <div class="tile kept" title="This one stays">
+                  <Thumb item={kept} alt={`Kept photo, ${kept.takenAt ?? 'unknown date'}`} />
+                  <span class="chip kept-chip">Kept</span>
+                </div>
+                <TileCaption item={kept} />
+              </li>
+            )}
+            {members.map((s) => (
+              <SuggestionTile
+                key={s.item.id}
+                s={s}
+                name={name}
+                on={selected.has(s.item.id)}
+                onToggle={onToggle}
+              />
+            ))}
+          </ul>
+        );
+      })}
     </section>
   );
 }
