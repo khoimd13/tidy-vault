@@ -67,6 +67,8 @@ export function buildTextBank(
     if (!v) throw new Error(`Missing text embedding for "${text}"`);
     return v;
   };
+  // Categories found another way (e.g. near-duplicates) have no prompts and take no part here.
+  categories = categories.filter((c) => c.prompts.length > 0);
   const prompts: PromptVec[] = categories.flatMap((c) =>
     c.prompts.map((text) => ({ categoryId: c.id, text, vec: normalize(need(text)) })),
   );

@@ -8,6 +8,11 @@ export interface PhotoItem {
   thumbUrl: string;
   /** ISO date (yyyy-mm-dd) when it could be read from the page, else null. */
   takenAt: string | null;
+  /**
+   * When it was taken, in milliseconds (wall-clock time read as UTC; only differences matter).
+   * Used to find near-duplicates. Missing for items scanned by older versions.
+   */
+  takenTs?: number | null;
   /** Tile width / height, or null when the tile had no size. */
   aspect: number | null;
   kind: 'photo' | 'video';

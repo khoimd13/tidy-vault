@@ -65,6 +65,24 @@ export function parseLabelDate(label: string): string | null {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+const TIME = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|SA|CH)?/i;
+
+/**
+ * Date and time from a tile label, in ms (wall-clock read as UTC; only differences matter).
+ * "Ảnh – Dọc – 19:38:50 24 thg 11, 2024" or "Photo - Mar 3, 2022, 10:15:23 AM".
+ */
+export function parseLabelTimestamp(label: string): number | null {
+  const date = parseLabelDate(label);
+  const t = TIME.exec(label);
+  if (!date || !t) return null;
+  let hours = Number(t[1]);
+  const mer = t[4]?.toUpperCase();
+  if ((mer === 'PM' || mer === 'CH') && hours < 12) hours += 12;
+  if ((mer === 'AM' || mer === 'SA') && hours === 12) hours = 0;
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return Date.UTC(y, m - 1, d, hours, Number(t[2]), Number(t[3] ?? 0));
+}
+
 /** A thumbnail URL carried by this one element, if any. */
 function thumbOf(el: Element): string {
   const latest = el.getAttribute('data-latest-bg');
@@ -141,6 +159,7 @@ export function readTile(tile: HTMLAnchorElement, origin: string): PhotoItem | n
     url: `${origin}/photo/${id}`,
     thumbUrl: toSizedThumb(findThumb(tile)),
     takenAt: parseLabelDate(label),
+    takenTs: parseLabelTimestamp(label),
     aspect: rect.width > 0 && rect.height > 0 ? rect.width / rect.height : null,
     kind: /^video\b/i.test(label.trim()) ? 'video' : 'photo',
     label,

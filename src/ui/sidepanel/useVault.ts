@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { heuristicClassifier, noSuggestions } from '../../ml/classifier';
 import { createClipClassifier } from '../../ml/clipClassifier';
+import { findNearDuplicates } from '../../ml/duplicates';
 import { isContentToPanel, type PanelToContent } from '../../shared/messages';
 import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '../../shared/types';
 import * as store from '../../store/db';
@@ -150,10 +151,34 @@ export function useVault() {
   // With the AI: only analysed photos are suggested (they appear as analysis runs), so the cruder
   // shape rule never shows wrong suggestions that then disappear. Without it: shape rule only.
   // If the model stops part-way, photos it already analysed keep their AI results.
+  // Bursts of near-identical photos: all but the sharpest of each group are suggested.
+  const duplicates = useMemo(
+    () =>
+      findNearDuplicates(
+        items.flatMap((i) => {
+          const a = ai.embeddings.get(i.id);
+          return a && i.kind === 'photo'
+            ? [
+                {
+                  id: i.id,
+                  takenTs: i.takenTs,
+                  takenAt: i.takenAt,
+                  vec: a.vec,
+                  sharpness: a.quality?.sharpness ?? 0,
+                },
+              ]
+            : [];
+        }),
+      ),
+    [items, ai.embeddings],
+  );
+
   const classifier = useMemo(() => {
     const unanalysed = ai.status.state === 'unavailable' ? heuristicClassifier : noSuggestions;
-    return ai.bank ? createClipClassifier(ai.bank, ai.embeddings, unanalysed) : unanalysed;
-  }, [ai.status.state, ai.bank, ai.embeddings]);
+    return ai.bank
+      ? createClipClassifier(ai.bank, ai.embeddings, unanalysed, duplicates)
+      : unanalysed;
+  }, [ai.status.state, ai.bank, ai.embeddings, duplicates]);
 
   const groups = useMemo(
     () => groupSuggestions(buildSuggestions(items, classifier, decisions, new Date())),

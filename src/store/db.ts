@@ -1,5 +1,6 @@
 /** Local storage for scanned items, decisions and image embeddings (IndexedDB, extension only). */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import type { Quality } from '../ml/quality';
 import type { Decision, PhotoItem } from '../shared/types';
 
 export interface StoredEmbedding {
@@ -7,6 +8,8 @@ export interface StoredEmbedding {
   /** Which model produced the vector, so a model change re-analyses photos. */
   model: string;
   vec: Float32Array;
+  /** Sharpness, brightness and contrast of the analysed thumbnail (image vectors only). */
+  quality?: Quality | null;
 }
 
 interface VaultSchema extends DBSchema {
@@ -70,15 +73,17 @@ export async function putEmbeddings(list: readonly StoredEmbedding[]): Promise<v
 
 /** Embeddings made by `model`; vectors from other models are ignored. */
 export async function getEmbeddings(model: string): Promise<Map<string, Float32Array>> {
-  return (await getEmbeddingsByModel([model])).get(model) ?? new Map();
+  const rows =
+    (await getEmbeddingsByModel([model])).get(model) ?? new Map<string, StoredEmbedding>();
+  return new Map([...rows].map(([id, e]) => [id, e.vec]));
 }
 
 /** One read of the store, split by model. Vectors from models not asked for are ignored. */
 export async function getEmbeddingsByModel(
   models: readonly string[],
-): Promise<Map<string, Map<string, Float32Array>>> {
-  const out = new Map(models.map((m) => [m, new Map<string, Float32Array>()]));
-  for (const e of await (await db()).getAll('embeddings')) out.get(e.model)?.set(e.id, e.vec);
+): Promise<Map<string, Map<string, StoredEmbedding>>> {
+  const out = new Map(models.map((m) => [m, new Map<string, StoredEmbedding>()]));
+  for (const e of await (await db()).getAll('embeddings')) out.get(e.model)?.set(e.id, e);
   return out;
 }
 
@@ -86,6 +91,14 @@ export async function putThumbs(list: readonly { id: string; blob: Blob }[]): Pr
   if (list.length === 0) return;
   const tx = (await db()).transaction('thumbs', 'readwrite');
   await Promise.all([...list.map((t) => tx.store.put(t)), tx.done]);
+}
+
+/** Saved thumbnails for these ids (null where none is saved), in one transaction. */
+export async function getThumbs(ids: readonly string[]): Promise<(Blob | null)[]> {
+  const tx = (await db()).transaction('thumbs');
+  const rows = await Promise.all(ids.map((id) => tx.store.get(id)));
+  await tx.done;
+  return rows.map((r) => r?.blob ?? null);
 }
 
 export async function getThumb(id: string): Promise<Blob | null> {

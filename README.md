@@ -1,7 +1,8 @@
 # Vault Tidy
 
 A Chrome extension that **suggests** clutter in your Google Photos library: screenshots,
-shopping pages and product ads, memes, receipts and documents, whiteboards and notes. An AI
+shopping pages and product ads, memes, receipts and documents, whiteboards and notes, blurry,
+dark or empty photos, accidental shots, and near-duplicate bursts. An AI
 model running on your own computer looks at each photo. You review the suggestions and decide.
 **It never deletes or changes anything in Google Photos.**
 
@@ -51,6 +52,13 @@ recognises screenshots by their shape.
 - **Confidence** is the total probability that a photo is clutter of any kind; the category is
   the best-matching one, and its closest sentence is shown as the reason. A phone-screen shape
   and age nudge confidence up.
+- **Image quality:** sharpness (variance of the Laplacian), brightness and contrast are measured
+  on each 224 px thumbnail. Clearly blurry, dark or empty images go to their own group; a
+  photo the AI sees as a memory but that measures very poor is only offered as "not sure".
+  Calibrated on real photos and blurred/darkened copies (`tests-model/quality.smoke.test.ts`).
+- **Near-duplicates:** photos taken within 10 minutes whose image vectors are at least 0.92
+  similar form a group; the sharpest is kept and the rest are suggested. Calibrated on
+  burst-like copies (`tests-model/duplicates.smoke.test.ts`: 99% caught).
 - **Caching:** image and text vectors are stored locally, so photos are analysed once and saved
   results show instantly next time.
 - **Measured** on 24 real screenshots and 26 real photos (`npm run test:model`): all screenshots

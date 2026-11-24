@@ -71,6 +71,41 @@ export const CATEGORIES: readonly CategoryDef[] = [
     ],
     needsModel: true,
   },
+  {
+    id: 'blurry',
+    name: 'Blurry, dark or empty photos',
+    icon: 'blur',
+    prompts: [
+      'a blurry photo',
+      'an out of focus photo',
+      'a photo with heavy motion blur',
+      'a very dark underexposed photo',
+      'a grainy low quality photo',
+    ],
+    needsModel: true,
+  },
+  {
+    id: 'accidental',
+    name: 'Accidental shots',
+    icon: 'hand-finger',
+    prompts: [
+      'an accidental photo of the floor',
+      'an accidental photo of the ceiling',
+      'a photo taken by accident inside a pocket',
+      'a finger covering the camera lens',
+      'a random photo of a plain wall',
+      'a photo of nothing in particular',
+    ],
+    needsModel: true,
+  },
+  {
+    // Found by comparing photos with each other, not by a description (see ml/duplicates.ts).
+    id: 'duplicates',
+    name: 'Near-duplicates',
+    icon: 'copy',
+    prompts: [],
+    needsModel: true,
+  },
 ];
 
 /**

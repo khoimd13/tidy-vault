@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseLabelDate,
+  parseLabelTimestamp,
   parsePhotoId,
   readVisibleItems,
   toSizedThumb,
@@ -131,5 +132,22 @@ describe('live-site formats (Nov 2026)', () => {
       takenAt: '2024-11-24',
       kind: 'photo',
     });
+  });
+});
+
+describe('parseLabelTimestamp', () => {
+  it('reads time and date from Vietnamese and English labels', () => {
+    expect(parseLabelTimestamp('Ảnh – Dọc – 19:38:50 24 thg 11, 2024')).toBe(
+      Date.UTC(2024, 10, 24, 19, 38, 50),
+    );
+    expect(parseLabelTimestamp('Photo - Portrait - Mar 3, 2022, 10:15:23 PM')).toBe(
+      Date.UTC(2022, 2, 3, 22, 15, 23),
+    );
+    expect(parseLabelTimestamp('Photo - Mar 3, 2022, 12:05:00 AM')).toBe(
+      Date.UTC(2022, 2, 3, 0, 5, 0),
+    );
+  });
+  it('returns null without a time', () => {
+    expect(parseLabelTimestamp('Ảnh – 24 thg 11, 2024')).toBeNull();
   });
 });

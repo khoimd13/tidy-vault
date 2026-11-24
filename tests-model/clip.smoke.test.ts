@@ -18,6 +18,7 @@ import {
 } from '@huggingface/transformers';
 import { describe, expect, it } from 'vitest';
 import { createClipClassifier } from '../src/ml/clipClassifier';
+import { measureQuality } from '../src/ml/quality';
 import { toConfidence } from '../src/ml/classifier';
 import { buildTextBank } from '../src/ml/zeroShot';
 import { CLIP_MODEL_ID } from '../src/ml/clip/protocol';
@@ -66,9 +67,19 @@ describe.skipIf(dirs.length === 0)('CLIP smoke test', () => {
           kind: 'photo',
           label: '',
         };
+        const gray = (await image.clone().resize(224, 224)).grayscale();
+        const quality = measureQuality(gray.data, gray.width, gray.height);
         const classifier = createClipClassifier(
           bank,
-          new Map([[name, image_embeds.data as Float32Array]]),
+          new Map([
+            [
+              name,
+              {
+                vec: image_embeds.data as Float32Array,
+                quality,
+              },
+            ],
+          ]),
         );
         const best = classifier.score(item, new Date()).sort((a, b) => b.score - a.score)[0];
         rows.push({
@@ -85,7 +96,10 @@ describe.skipIf(dirs.length === 0)('CLIP smoke test', () => {
     const shots = rows.filter((r) => r.expected === 'clutter');
     const photos = rows.filter((r) => r.expected === 'keep');
     const shotHits = shots.filter((r) => r.got !== 'keep' && !r.got.endsWith('/-')).length;
-    const photoFalseHigh = photos.filter((r) => r.got.endsWith('/high')).length;
+    // A High backed by measured poor quality (blank, very dark or very blurry) is correct.
+    const photoFalseHigh = photos.filter(
+      (r) => r.got.endsWith('/high') && !/^(Very|Almost|Washed|Looks blurry)/.test(r.why),
+    ).length;
     console.log(`screenshots suggested: ${shotHits}/${shots.length}`);
     console.log(`photos wrongly at High: ${photoFalseHigh}/${photos.length}`);
     expect(photoFalseHigh).toBe(0);

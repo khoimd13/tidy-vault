@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createClipClassifier } from '../../src/ml/clipClassifier';
+import { createClipClassifier, type Analysis } from '../../src/ml/clipClassifier';
 import { buildTextBank, dot, meanNormalized, normalize, zeroShot } from '../../src/ml/zeroShot';
 import type { CategoryDef } from '../../src/shared/types';
 import { photo } from '../fixtures';
@@ -55,12 +55,20 @@ describe('zeroShot', () => {
 });
 
 describe('createClipClassifier', () => {
-  const embeddings = new Map([
-    ['shot', v(1, 0, 0, 0)],
-    ['ad', v(0.2, 1, 0, 0)],
-    ['person', v(0, 0, 1, 0)],
+  const sharp = { sharpness: 500, brightness: 120, contrast: 60 };
+  const blurry = { sharpness: 2, brightness: 120, contrast: 50 };
+  const a = (vec: Float32Array, quality: Analysis['quality'] = sharp): Analysis => ({
+    vec,
+    quality,
+  });
+  const analyses = new Map<string, Analysis>([
+    ['shot', a(v(1, 0, 0, 0))],
+    ['ad', a(v(0.2, 1, 0, 0))],
+    ['person', a(v(0, 0, 1, 0))],
+    ['blurry-person', a(v(0, 0, 1, 0), blurry)],
+    ['blurry-shot', a(v(1, 0, 0, 0), blurry)],
   ]);
-  const classifier = createClipClassifier(bank, embeddings);
+  const classifier = createClipClassifier(bank, analyses);
 
   it('suggests clutter with a total-clutter score and a plain reason', () => {
     const [s] = classifier.score(photo('shot', { aspect: 9 / 19.5, takenAt: '2021-01-01' }), NOW);
@@ -73,6 +81,31 @@ describe('createClipClassifier', () => {
 
   it('suggests nothing for a photo that looks like a memory', () => {
     expect(classifier.score(photo('person', { aspect: 9 / 19.5 }), NOW)).toEqual([]);
+  });
+
+  it('files clearly poor images under blurry, with the measured reason first', () => {
+    const [s] = classifier.score(photo('blurry-shot', { aspect: 4 / 3 }), NOW);
+    expect(s?.categoryId).toBe('blurry');
+    expect(s?.reasons[0]).toBe('Very blurry');
+  });
+
+  it('offers a very poor photo that looks like a memory as Medium only', () => {
+    const [s] = classifier.score(photo('blurry-person', { aspect: 4 / 3, takenAt: null }), NOW);
+    expect(s).toEqual({ categoryId: 'blurry', score: 0.62, reasons: ['Very blurry'] });
+  });
+
+  it('suggests near-duplicates that are not the kept photo', () => {
+    const dups = new Map([
+      ['person', { keepId: 'other', similarity: 0.97, minutesApart: 1, groupSize: 2 }],
+    ]);
+    const withDups = createClipClassifier(bank, analyses, undefined, dups);
+    const [s] = withDups.score(photo('person', { takenAt: null }), NOW);
+    expect(s?.categoryId).toBe('duplicates');
+    expect(s?.score).toBeCloseTo(0.9);
+    expect(s?.reasons).toEqual([
+      'Very similar to a photo taken 1 min apart',
+      'Keeping the sharpest',
+    ]);
   });
 
   it('falls back to the shape heuristic before a photo is analysed', () => {

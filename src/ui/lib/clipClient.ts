@@ -1,5 +1,6 @@
 /** Promise wrapper around the CLIP Web Worker, including restart-on-failure. */
 import type { WorkerRequest, WorkerResponse } from '../../ml/clip/protocol';
+import type { Quality } from '../../ml/quality';
 
 type Pending = { resolve: (r: WorkerResponse) => void; reject: (e: Error) => void };
 
@@ -95,10 +96,12 @@ export class ClipClient {
     return res.vectors.map((v) => v ?? new Float32Array());
   }
 
-  async embedImages(images: Blob[]): Promise<(Float32Array | null)[]> {
+  async embedImages(
+    images: Blob[],
+  ): Promise<{ vectors: (Float32Array | null)[]; quality: (Quality | null)[] }> {
     const res = await this.request<'embedImages'>({ type: 'embedImages', images });
     if (res.type !== 'vectors') throw new Error('Unexpected reply');
-    return res.vectors;
+    return { vectors: res.vectors, quality: res.quality ?? res.vectors.map(() => null) };
   }
 
   /** Stops the worker; anything still waiting is rejected instead of hanging forever. */

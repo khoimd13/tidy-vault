@@ -3,6 +3,7 @@
  * then embeds every photo that has no embedding yet (in small batches) and saves the result.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { Analysis } from '../../ml/clipClassifier';
 import { CLIP_MODEL_ID } from '../../ml/clip/protocol';
 import { buildTextBank, type TextBank } from '../../ml/zeroShot';
 import { CATEGORIES, KEEP_PROMPTS } from '../../shared/categories';
@@ -10,10 +11,13 @@ import type { PhotoItem } from '../../shared/types';
 import * as store from '../../store/db';
 import { ClipClient } from '../lib/clipClient';
 
-/** Stored with each vector; change it when the model or its preprocessing changes. */
-const MODEL_KEY = `${CLIP_MODEL_ID}:q8`;
+/**
+ * Stored with each image vector; change it when the model, its preprocessing or what is measured
+ * changes (v2 adds sharpness/brightness/contrast), so photos are analysed again.
+ */
+const MODEL_KEY = `${CLIP_MODEL_ID}:q8:v2`;
 /** Text prompt vectors are stored under their own key (id = the prompt text). */
-const TEXT_KEY = `${MODEL_KEY}:text`;
+const TEXT_KEY = `${CLIP_MODEL_ID}:q8:text`;
 const BATCH = 8;
 /** Re-render at most this often while analysing; every batch re-scores the whole library. */
 const COMMIT_EVERY_MS = 700;
@@ -38,7 +42,7 @@ const message = (err: unknown) => (err instanceof Error ? err.message : String(e
 export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null) {
   const [status, setStatus] = useState<AiStatus>({ state: 'loading' });
   const [bank, setBank] = useState<TextBank | null>(null);
-  const [embeddings, setEmbeddings] = useState<Map<string, Float32Array>>(new Map());
+  const [embeddings, setEmbeddings] = useState<Map<string, Analysis>>(new Map());
   /** Thumbnail URLs that couldn't be loaded. Keyed by URL, so a rescan with a fresh URL retries. */
   const [failedUrls, setFailedUrls] = useState<ReadonlySet<string>>(new Set());
 
@@ -67,8 +71,16 @@ export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null
       try {
         const texts = [...CATEGORIES.flatMap((cat) => cat.prompts), ...KEEP_PROMPTS];
         const saved = await store.getEmbeddingsByModel([MODEL_KEY, TEXT_KEY]);
-        const savedImages = saved.get(MODEL_KEY) ?? new Map<string, Float32Array>();
-        const savedText = saved.get(TEXT_KEY) ?? new Map<string, Float32Array>();
+        const savedImages = new Map(
+          [...(saved.get(MODEL_KEY) ?? new Map<string, store.StoredEmbedding>())].map(
+            ([id, e]): [string, Analysis] => [id, { vec: e.vec, quality: e.quality ?? null }],
+          ),
+        );
+        const savedText = new Map(
+          [...(saved.get(TEXT_KEY) ?? new Map<string, store.StoredEmbedding>())].map(
+            ([id, e]): [string, Float32Array] => [id, e.vec],
+          ),
+        );
         if (!alive.current) return;
         embRef.current = new Map([...savedImages, ...embRef.current]);
         publish();
@@ -124,17 +136,26 @@ export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null
             .slice(0, BATCH);
           if (todo.length === 0) break;
 
-          let blobs: (Blob | null)[];
-          try {
-            blobs = await fetchThumbs(todo.map((i) => i.thumbUrl));
-          } catch {
-            break; // The Google Photos tab went away; resume when it's back.
+          // Re-use thumbnails saved by an earlier analysis; only download the missing ones.
+          const blobs = await store.getThumbs(todo.map((i) => i.id));
+          const missing = todo.flatMap((item, k) => (blobs[k] ? [] : [k]));
+          if (missing.length > 0) {
+            let fetched: (Blob | null)[];
+            try {
+              fetched = await fetchThumbs(missing.map((k) => todo[k]?.thumbUrl ?? ''));
+            } catch {
+              break; // The Google Photos tab went away; resume when it's back.
+            }
+            missing.forEach((k, n) => (blobs[k] = fetched[n] ?? null));
           }
           const ready = todo.filter((_, k) => blobs[k] !== null);
           let vectors: (Float32Array | null)[] = [];
+          let quality: (Analysis['quality'] | null)[] = [];
           try {
             if (ready.length) {
-              vectors = await c.embedImages(blobs.filter((b): b is Blob => b !== null));
+              ({ vectors, quality } = await c.embedImages(
+                blobs.filter((b): b is Blob => b !== null),
+              ));
             }
             failedBatches = 0;
           } catch (err) {
@@ -154,8 +175,9 @@ export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null
             const k = ready.indexOf(item);
             const vec = k >= 0 ? vectors[k] : null;
             if (vec) {
-              next.set(item.id, vec);
-              toSave.push({ id: item.id, model: MODEL_KEY, vec });
+              const q = quality[k] ?? null;
+              next.set(item.id, { vec, quality: q });
+              toSave.push({ id: item.id, model: MODEL_KEY, vec, quality: q });
             } else {
               failedRef.current.add(item.thumbUrl);
             }

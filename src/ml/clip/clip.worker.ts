@@ -16,6 +16,7 @@ import {
 } from '@huggingface/transformers';
 // The 26 MB WebAssembly binary is emitted once by Vite; only its small JS loader lives in /ort.
 import ortWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
+import { measureQuality, type Quality } from '../quality';
 import { CLIP_MODEL_ID, type WorkerRequest, type WorkerResponse } from './protocol';
 
 interface Loaded {
@@ -89,15 +90,42 @@ async function embedText(m: Loaded, texts: string[]): Promise<Float32Array[]> {
   return rows(text_embeds);
 }
 
-async function embedImages(m: Loaded, blobs: Blob[]): Promise<(Float32Array | null)[]> {
+/** Size the quality thresholds were calibrated at (Google's thumbnails are fetched at this size). */
+const QUALITY_SIZE = 224;
+
+/** Measures quality on the image shrunk to fit 224 px, so results don't depend on input size. */
+async function qualityOf(image: RawImage): Promise<Quality | null> {
+  try {
+    const scale = Math.min(1, QUALITY_SIZE / Math.max(image.width, image.height));
+    const sized =
+      scale < 1
+        ? await image.resize(
+            Math.max(3, Math.round(image.width * scale)),
+            Math.max(3, Math.round(image.height * scale)),
+          )
+        : image.clone();
+    const gray = sized.grayscale();
+    return measureQuality(gray.data, gray.width, gray.height);
+  } catch {
+    return null;
+  }
+}
+
+async function embedImages(
+  m: Loaded,
+  blobs: Blob[],
+): Promise<{ vectors: (Float32Array | null)[]; quality: (Quality | null)[] }> {
   const images = await Promise.all(blobs.map((b) => RawImage.fromBlob(b).catch(() => null)));
+  const quality = await Promise.all(
+    images.map((img) => (img ? qualityOf(img) : Promise.resolve(null))),
+  );
   const ok = images.filter((i): i is RawImage => i !== null);
-  if (ok.length === 0) return images.map(() => null);
+  if (ok.length === 0) return { vectors: images.map(() => null), quality };
   const inputs = (await m.processor(ok)) as Record<string, unknown>;
   const { image_embeds } = (await m.visionModel(inputs)) as { image_embeds: Tensor };
   const vecs = rows(image_embeds);
   let k = 0;
-  return images.map((img) => (img === null ? null : (vecs[k++] ?? null)));
+  return { vectors: images.map((img) => (img === null ? null : (vecs[k++] ?? null))), quality };
 }
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
@@ -117,7 +145,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       }
       case 'embedImages': {
         if (!loaded) throw new Error('Model not initialised');
-        post({ type: 'vectors', id: msg.id, vectors: await embedImages(await loaded, msg.images) });
+        const { vectors, quality } = await embedImages(await loaded, msg.images);
+        post({ type: 'vectors', id: msg.id, vectors, quality });
         break;
       }
     }
