@@ -31,14 +31,43 @@ export function parseLabelDate(label: string): string | null {
   return new Date(t).toISOString().slice(0, 10);
 }
 
+const THUMB_HOST = 'googleusercontent.com';
+
+/** A thumbnail URL carried by this one element, if any. */
+function thumbOf(el: Element): string {
+  const latest = el.getAttribute('data-latest-bg');
+  if (latest?.includes(THUMB_HOST)) return latest;
+  const src = el.getAttribute('src');
+  if (el.tagName === 'IMG' && src?.includes(THUMB_HOST)) return src;
+  if (el instanceof HTMLElement) {
+    const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage);
+    if (m?.[1]?.includes(THUMB_HOST)) return m[1];
+  }
+  return '';
+}
+
+function thumbInSubtree(root: Element): string {
+  const candidates = root.querySelectorAll('[data-latest-bg], img, [style*="background"]');
+  for (const el of [root, ...Array.from(candidates)]) {
+    const url = thumbOf(el);
+    if (url) return url;
+  }
+  return '';
+}
+
+/**
+ * The thumbnail is usually not inside the photo link but next to it, in the same tile wrapper.
+ * Search the link, then each wrapper above it, stopping before a wrapper that also holds another
+ * photo (so a neighbour's thumbnail is never picked up).
+ */
 function findThumb(tile: Element): string {
-  const img = tile.querySelector<HTMLImageElement>('img[src*="googleusercontent"]');
-  if (img?.getAttribute('src')) return img.getAttribute('src') ?? '';
-  const nodes = [tile, ...Array.from(tile.querySelectorAll('[style*="background-image"]'))];
-  for (const node of nodes) {
-    const bg = node instanceof HTMLElement ? node.style.backgroundImage : '';
-    const m = /url\(["']?(.*?)["']?\)/.exec(bg);
-    if (m?.[1]) return m[1];
+  let scope: Element | null = tile;
+  for (let depth = 0; scope && depth < 6; depth++) {
+    const url = thumbInSubtree(scope);
+    if (url) return url;
+    const parent: Element | null = scope.parentElement;
+    if (!parent || parent.querySelectorAll(PHOTO_LINK).length > 1) break;
+    scope = parent;
   }
   return '';
 }

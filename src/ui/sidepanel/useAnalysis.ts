@@ -187,13 +187,15 @@ export function useAnalysis(items: PhotoItem[]) {
 
   const progress = useMemo(() => {
     const photos = items.filter(analysable);
+    /** Photos the page reader found no thumbnail for: the AI can't look at these at all. */
+    const noThumbnail = items.filter((i) => i.kind === 'photo' && i.thumbUrl === '').length;
     let done = 0;
     let failed = 0;
     for (const i of photos) {
       if (embeddings.has(i.id)) done += 1;
       else if (failedUrls.has(i.thumbUrl)) failed += 1;
     }
-    return { done, total: photos.length, failed };
+    return { done, total: photos.length, failed, noThumbnail };
   }, [items, embeddings, failedUrls]);
 
   return { status, bank, embeddings, progress, reset };

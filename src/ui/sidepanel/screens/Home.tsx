@@ -44,7 +44,7 @@ export function Home({ vault, onReview, onCleanup }: Props) {
       {vault.groups.map((g) => (
         <GroupCard key={g.categoryId} group={g} onReview={() => onReview(g.categoryId)} />
       ))}
-      {vault.itemCount > 0 && vault.groups.length === 0 && vault.scan.state !== 'running' && (
+      {vault.groups.length === 0 && vault.scan.state !== 'running' && aiFinished(vault) && (
         <p class="empty">All caught up. New suggestions show up after your next scan.</p>
       )}
 
@@ -163,9 +163,35 @@ function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () =
   );
 }
 
+/** True when every photo that can be analysed has been (or the AI is off and rules apply). */
+function aiFinished(vault: Vault): boolean {
+  const { status, progress } = vault.ai;
+  if (status.state === 'unavailable') return vault.itemCount > 0;
+  return progress.done > 0 && progress.done + progress.failed >= progress.total;
+}
+
 /** One quiet line about the AI model: loading, analysing (with progress), done, or unavailable. */
 function AiLine({ vault }: { vault: Vault }) {
   const { status, progress } = vault.ai;
+  // The page reader found photos but none of their thumbnails: say so plainly instead of
+  // looking like there is nothing to clean up.
+  if (progress.total === 0 && progress.noThumbnail > 0) {
+    return (
+      <p class="notice" role="alert">
+        Vault Tidy found {progress.noThumbnail.toLocaleString()} photos but couldn't read their
+        thumbnails, so the AI can't look at them. Reload the Google Photos tab and scan again. If
+        this keeps happening, Google Photos has changed its page and Vault Tidy needs an update.
+      </p>
+    );
+  }
+  if (status.state === 'ready' && progress.done === 0 && progress.failed > 0) {
+    return (
+      <p class="notice" role="alert">
+        Couldn't load any of the {progress.failed.toLocaleString()} thumbnails, so the AI can't look
+        at them. Check that you're signed in to Google Photos in this browser, then scan again.
+      </p>
+    );
+  }
   if (status.state === 'unavailable') {
     return (
       <p class="notice" title={status.message}>

@@ -76,3 +76,29 @@ describe('readVisibleItems safety', () => {
     expect(item?.thumbUrl).toBe('');
   });
 });
+
+describe('thumbnail lookup in real-world tile layouts', () => {
+  it('finds a thumbnail that sits next to the link in the tile wrapper', () => {
+    document.body.innerHTML = `
+      <div class="row">
+        <div class="tile">
+          <div style="background-image: url('https://lh3.googleusercontent.com/one=w200')"></div>
+          <a href="./photo/ONE" aria-label="Photo - Mar 3, 2022"></a>
+        </div>
+        <div class="tile">
+          <div data-latest-bg="https://lh3.googleusercontent.com/two=w200"></div>
+          <a href="./photo/TWO" aria-label="Photo - Mar 4, 2022"></a>
+        </div>
+        <div class="tile">
+          <a href="./photo/THREE" aria-label="Photo - Mar 5, 2022"></a>
+        </div>
+      </div>`;
+    const items = readVisibleItems(document, 'https://photos.google.com');
+    expect(items.map((i) => [i.id, i.thumbUrl])).toEqual([
+      ['ONE', 'https://lh3.googleusercontent.com/one=w224-h224'],
+      ['TWO', 'https://lh3.googleusercontent.com/two=w224-h224'],
+      // No thumbnail of its own: it must not borrow a neighbour's.
+      ['THREE', ''],
+    ]);
+  });
+});
