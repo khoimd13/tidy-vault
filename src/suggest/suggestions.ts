@@ -39,6 +39,8 @@ export interface SuggestionGroup {
   counts: Record<Confidence, number>;
   /** "Mostly from … to …": 10th and 90th percentile dates, or null when unknown. */
   span: { from: string; to: string } | null;
+  /** Up to six of the most confident suggestions, for the card's preview strip. */
+  samples: Suggestion[];
   /** The most common main reason in the group, for the card's "why" line. */
   topReason: string | null;
   /** Higher is shown first: count × average score. */
@@ -77,6 +79,7 @@ export function groupSuggestions(suggestions: readonly Suggestion[]): Suggestion
       counts[s.confidence] += 1;
       total += s.score;
     }
+    const confident = list.filter((s) => s.confidence === 'high');
     const dates = list
       .map((s) => s.item.takenAt)
       .filter((d): d is string => d !== null)
@@ -90,7 +93,11 @@ export function groupSuggestions(suggestions: readonly Suggestion[]): Suggestion
       suggestions: sorted,
       counts,
       span: dates.length ? { from: percentile(dates, 0.1), to: percentile(dates, 0.9) } : null,
-      topReason: mostCommon(list.flatMap((s) => s.reasons.slice(0, 1))),
+      // Explain the group by its confident members; weak matches shouldn't set the headline.
+      topReason: mostCommon(
+        (confident.length ? confident : list).flatMap((s) => s.reasons.slice(0, 1)),
+      ),
+      samples: [...list].sort((a, b) => b.score - a.score).slice(0, 6),
       rank: total,
     });
   }

@@ -9,3 +9,10 @@ coverage/
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Bundled at build time, not committed
+public/ort/
+public/models/
+
+# Local sample images for the AI preview
+preview/samples/

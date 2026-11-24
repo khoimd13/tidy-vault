@@ -1,8 +1,8 @@
 {
   "name": "vault-tidy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Suggestion-only cleanup assistant for Google Photos (Chrome extension).",
+  "description": "Suggestion-only cleanup assistant for Google Photos with on-device AI (Chrome extension).",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -21,7 +21,12 @@
     "coverage": "vitest run --coverage",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "prepare": "husky",
-    "preview:ui": "vite --config preview/vite.config.ts"
+    "preview:ui": "vite --config preview/vite.config.ts",
+    "assets": "node scripts/prepare-assets.mjs",
+    "model:fetch": "node scripts/prepare-assets.mjs --model",
+    "predev": "npm run -s assets",
+    "prebuild": "npm run -s assets",
+    "test:model": "vitest run --config vitest.model.config.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js}": [
@@ -31,6 +36,7 @@
     "*.{json,md,css,html,yml}": "prettier --write"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "idb": "^8.0.4",
     "preact": "^10.29.8"
   },

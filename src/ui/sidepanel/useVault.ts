@@ -1,12 +1,14 @@
 /** All side panel state in one hook: the Google Photos tab, scan progress, items and decisions. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { heuristicClassifier } from '../../ml/classifier';
+import { heuristicClassifier, noSuggestions } from '../../ml/classifier';
+import { createClipClassifier } from '../../ml/clipClassifier';
 import { isContentToPanel, type PanelToContent } from '../../shared/messages';
 import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '../../shared/types';
 import * as store from '../../store/db';
 import { buildCleanupList } from '../../suggest/cleanupList';
 import { buildSuggestions, groupSuggestions } from '../../suggest/suggestions';
 import { findPhotosTabId, sendToTab } from '../lib/chromeApi';
+import { useAnalysis } from './useAnalysis';
 
 export interface ScanStatus {
   state: ScanState;
@@ -112,9 +114,19 @@ export function useVault() {
     void command('ping');
   }, [tabId, tabLoads, command]);
 
+  const ai = useAnalysis(items);
+
+  // With the AI: only analysed photos are suggested (they appear as analysis runs), so the cruder
+  // shape rule never shows wrong suggestions that then disappear. Without it: shape rule only.
+  const classifier = useMemo(() => {
+    if (ai.status.state === 'unavailable') return heuristicClassifier;
+    if (!ai.bank) return noSuggestions;
+    return createClipClassifier(ai.bank, ai.embeddings, noSuggestions);
+  }, [ai.status.state, ai.bank, ai.embeddings]);
+
   const groups = useMemo(
-    () => groupSuggestions(buildSuggestions(items, heuristicClassifier, decisions, new Date())),
-    [items, decisions],
+    () => groupSuggestions(buildSuggestions(items, classifier, decisions, new Date())),
+    [items, classifier, decisions],
   );
 
   const decide = useCallback(async (list: Suggestion[], kind: DecisionKind) => {
@@ -148,7 +160,8 @@ export function useVault() {
     await store.clearAll();
     setItems([]);
     setDecisions(new Map());
-  }, []);
+    ai.reset();
+  }, [ai.reset]);
 
   const counts = useMemo(() => {
     let clutter = 0;
@@ -165,6 +178,7 @@ export function useVault() {
   return {
     onPhotos: tabId !== null,
     scan,
+    ai: { status: ai.status, progress: ai.progress },
     itemCount: items.length,
     groups,
     cleanup,

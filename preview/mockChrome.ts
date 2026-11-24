@@ -22,7 +22,50 @@ function fakeThumb(i: number, aspect: number): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * Optional real images for testing the AI: put .jpg/.png files and an index.json (a list of file
+ * names) in preview/samples/ (git-ignored), then open the preview with ?samples.
+ */
+interface Sample {
+  file: string;
+  aspect: number;
+}
+
+async function loadSamples(): Promise<Sample[]> {
+  if (!new URLSearchParams(location.search).has('samples')) return [];
+  try {
+    const files = (await (await fetch('/samples/index.json')).json()) as string[];
+    return await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<Sample>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve({ file, aspect: img.naturalWidth / img.naturalHeight });
+            img.onerror = () => resolve({ file, aspect: 1 });
+            img.src = `/samples/${file}`;
+          }),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+const samples = await loadSamples();
+
 function fakeItem(i: number): PhotoItem {
+  const sample = samples[i];
+  if (sample) {
+    return {
+      id: `sample-${sample.file}`,
+      url: `https://photos.google.com/photo/sample${i}`,
+      thumbUrl: `/samples/${sample.file}`,
+      takenAt: `${2019 + (i % 6)}-0${(i % 9) + 1}-15`,
+      aspect: sample.aspect,
+      kind: 'photo',
+      label: sample.file,
+    };
+  }
   // Roughly: half screenshots (phone shape), some desktop screenshots, the rest camera photos.
   const shapes = [9 / 19.5, 3 / 4, 9 / 20, 4 / 3, 16 / 9, 9 / 16, 3 / 4];
   const aspect = shapes[i % shapes.length] ?? 1;
@@ -41,7 +84,7 @@ function fakeItem(i: number): PhotoItem {
 
 const listeners = new Set<Listener>();
 const storage = new Map<string, unknown>();
-const TOTAL = 240;
+const TOTAL = samples.length || 240;
 const PER_STEP = 24;
 
 let state: ScanState = 'idle';

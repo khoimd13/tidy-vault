@@ -40,3 +40,6 @@ export const heuristicClassifier: Classifier = {
     return [{ categoryId: 'screenshots', score, reasons }];
   },
 };
+
+/** Suggests nothing; used while a photo is waiting for the image model. */
+export const noSuggestions: Classifier = { score: () => [] };

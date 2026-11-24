@@ -16,7 +16,12 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  // Keep this list minimal. Add `offscreen` and *.googleusercontent.com when the CLIP model lands.
+  // Keep this list minimal. googleusercontent.com is where Google serves photo thumbnails; the
+  // side panel only fetches them (read-only) so the on-device AI can look at them.
   permissions: ['sidePanel', 'storage'],
-  host_permissions: ['https://photos.google.com/*'],
+  host_permissions: ['https://photos.google.com/*', 'https://*.googleusercontent.com/*'],
+  // The AI runtime is WebAssembly bundled with the extension; nothing remote is ever executed.
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+  },
 });

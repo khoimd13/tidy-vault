@@ -1,23 +1,30 @@
 # Vault Tidy
 
-A Chrome extension that **suggests** clutter in your Google Photos library (old screenshots
-first; shopping ads, memes and receipts once the AI model lands). You review the suggestions,
-and you decide. **It never deletes or changes anything in Google Photos.**
+A Chrome extension that **suggests** clutter in your Google Photos library: screenshots,
+shopping pages and product ads, memes, receipts and documents, whiteboards and notes. An AI
+model running on your own computer looks at each photo. You review the suggestions and decide.
+**It never deletes or changes anything in Google Photos.**
 
-- Runs entirely on your computer. No servers, no analytics.
+- Runs entirely on your computer: the AI model ships inside the extension. No servers, no
+  analytics, nothing uploaded.
 - Only reads what photos.google.com shows in your own browser tab.
 - Everything is reversible: Keep, Add to cleanup list and Remove all have Undo.
 
-> Status: **v0.1, first working slice.** The scan, the screenshot heuristic, review and cleanup
-> list work end to end. The CLIP image model, learning from your choices and the face protection
-> are next (see [docs/UX_AND_AI_PLAN.md](docs/UX_AND_AI_PLAN.md)).
+> Status: **v0.2.** Scan, on-device CLIP classification of five categories, review and cleanup
+> list work end to end. Learning from your choices and face protection are next (see
+> [docs/UX_AND_AI_PLAN.md](docs/UX_AND_AI_PLAN.md)).
 
 ## Install (developer mode)
 
 ```powershell
 npm install
+npm run model:fetch
 npm run build
 ```
+
+`model:fetch` downloads the CLIP model once (about 150 MB, from Hugging Face) into
+`public/models`. It is bundled into the extension; without it Vault Tidy still works but only
+recognises screenshots by their shape.
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and pick the `dist` folder.
@@ -27,45 +34,67 @@ npm run build
 ## Using it
 
 1. **Find suggestions** scrolls through whatever Google Photos is showing (your library, a
-   search such as `screenshots`, or an album) and lists photos that look like clutter.
+   search such as `screenshots`, or an album). The AI then looks at each photo; suggestions
+   appear as it goes.
 2. **Review** a group. "Likely clutter" starts selected; untick anything you want to keep.
-   "Not sure" photos are only added if you tap them.
+   "Not sure" photos are only added if you tap them. Shortcuts: Y add, K keep, A all, Esc back.
 3. **Cleanup list** holds what you confirmed. Copy the links or export a CSV, then remove the
    photos yourself in Google Photos (the list has a short guide).
 
+## How the AI works
+
+- **Model:** CLIP ViT-B/32 (`Xenova/clip-vit-base-patch32`, 8-bit), run with transformers.js and
+  ONNX Runtime in a Web Worker. Uses WebGPU when available, otherwise WebAssembly.
+- **Zero-shot:** each category is described by several sentences ("a screenshot of an online
+  shopping website", …), averaged. Everyday photo types ("a selfie", "a landscape photo", …)
+  compete with them, so a photo is only flagged when it looks more like clutter than a memory.
+- **Confidence** is the total probability that a photo is clutter of any kind; the category is
+  the best-matching one, and its closest sentence is shown as the reason. A phone-screen shape
+  and age nudge confidence up.
+- **Caching:** image and text vectors are stored locally, so photos are analysed once and saved
+  results show instantly next time.
+- **Measured** on 24 real screenshots and 26 real photos (`npm run test:model`): all screenshots
+  rated High, no photo rated High.
+
 ## Development
 
-| Command              | What it does                                                   |
-| -------------------- | -------------------------------------------------------------- |
-| `npm run dev`        | Extension dev build with hot reload (load `dist` unpacked)     |
-| `npm run preview:ui` | Side panel in a normal tab with fake photos, at localhost:5199 |
-| `npm run build`      | Type-check and production build into `dist`                    |
-| `npm run check`      | Type-check, lint, format check and unit tests (same as CI)     |
-| `npm run coverage`   | Unit tests with a coverage report                              |
+| Command               | What it does                                                     |
+| --------------------- | ---------------------------------------------------------------- |
+| `npm run dev`         | Extension dev build with hot reload (load `dist` unpacked)       |
+| `npm run preview:ui`  | Side panel in a normal tab with fake data, at localhost:5199     |
+| `npm run build`       | Type-check and production build into `dist`                      |
+| `npm run check`       | Type-check, lint, format check and unit tests (same as CI)       |
+| `npm run model:fetch` | Download the CLIP model into `public/models` (once)              |
+| `npm run test:model`  | Opt-in check of the real model on your own images (see the file) |
+| `npm run coverage`    | Unit tests with a coverage report                                |
 
 UI preview options: `?welcome=no` skips the welcome screen, `?photos=no` simulates a tab that
-is not Google Photos.
+is not Google Photos, and `?samples` uses real images from `preview/samples/` (git-ignored; add
+images plus an `index.json` listing their file names) so the real model runs in the preview.
 
 ## Architecture
 
 ```
 src/
-  shared/       Types, message contracts, built-in categories     (pure)
+  shared/       Types, message contracts, categories and their AI prompts    (pure)
   source/       googlePhotosDom.ts: the ONLY code that knows the Google Photos page
-  scan/         Scanner: gentle scrolling, de-duplication, pause/resume/cancel   (pure)
-  ml/           Signals and classifiers (heuristic now, CLIP next)              (pure)
-  suggest/      Suggestions, grouping, cleanup list, CSV export                (pure)
-  store/        IndexedDB persistence (extension origin only)
+  scan/         Scanner: gentle scrolling, de-duplication, pause/resume/cancel (pure)
+  ml/           Signals, zero-shot maths, classifiers (pure) + clip/ Web Worker
+  suggest/      Suggestions, grouping, cleanup list, CSV export              (pure)
+  store/        IndexedDB persistence: items, decisions, embeddings
   content/      Content script: wires source + scan, talks to the panel
   background/   Service worker: opens the side panel from the toolbar icon
-  ui/           Side panel (Preact): screens, components, useVault state hook
+  ui/           Side panel (Preact): screens, components, useVault/useAnalysis hooks
+scripts/        prepare-assets.mjs: bundles ONNX Runtime and (optionally) the model
 preview/        Dev-only harness with fake chrome APIs (never shipped)
 tests/          Vitest unit tests, mirroring src/
+tests-model/    Opt-in tests against the real model
 docs/           Build prompt and the UX + AI plan
 ```
 
 Data flow: **content script** reads tiles → messages → **side panel** stores them →
-**classifier** scores → **suggestions** are grouped → you decide → decisions are stored.
+**CLIP worker** embeds thumbnails → **classifier** scores → **suggestions** are grouped → you
+decide → decisions are stored.
 
 Two rules are enforced by ESLint so the structure stays easy to maintain:
 
@@ -80,22 +109,30 @@ Two rules are enforced by ESLint so the structure stays easy to maintain:
 - **ESLint** with type-aware rules (typescript-eslint) plus the architecture rules above.
 - **Prettier** for formatting, checked in CI.
 - **Vitest** unit tests for all pure modules, the page reader (happy-dom) and storage
-  (fake-indexeddb).
+  (fake-indexeddb); an opt-in suite runs the real model.
 - **Git hooks** (husky): `pre-commit` runs lint-staged; `pre-push` only allows pushing to the
   personal remote `git@github-personal:…` and runs `npm run check`.
-- **GitHub Actions** runs `npm run check` and `npm run build` on every push and pull request.
+- **GitHub Actions** runs `npm run check` and `npm run build` on every push and pull request
+  (without the model download).
 
-## Privacy
+## Privacy and permissions
 
-Vault Tidy asks only for `sidePanel`, `storage` and access to `photos.google.com`. Scanned items
-(id, link, date, thumbnail link, shape) and your decisions are stored in the extension's own
-IndexedDB on this computer. **Clear local data** on the home screen wipes them.
+- `sidePanel`, `storage`.
+- `photos.google.com`: to read the photo grid you are looking at.
+- `*.googleusercontent.com`: where Google serves photo thumbnails. The side panel downloads the
+  small thumbnails so the on-device AI can look at them. Nothing is uploaded anywhere.
+- Content Security Policy allows WebAssembly (`wasm-unsafe-eval`) for the bundled AI runtime.
+  No code or model is ever loaded from the internet at runtime.
 
-## Known limits (v0.1)
+Scanned items (id, link, date, thumbnail link, shape), AI vectors and your decisions are stored
+in the extension's own IndexedDB on this computer. **Clear local data** wipes them.
+
+## Known limits
 
 - Page selectors and English date parsing in `googlePhotosDom.ts` are best-effort and still need
   checking against the live site. Non-English Google Photos shows no dates yet.
-- Only the **Screenshots** category is scored (by screen shape and age). Other categories need
-  the image model.
+- Thumbnails are fetched with your Google session from the extension; this needs checking on the
+  live site too.
+- The extension is about 230 MB because the model is bundled.
 - Opening a suggested photo works through its link; there is no bulk action in Google Photos yet
   (the v1.5 "to remove" album is planned, see the docs).

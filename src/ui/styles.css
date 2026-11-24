@@ -362,3 +362,10 @@ details ol {
   font-size: 11px;
   width: 100%;
 }
+
+.ai {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

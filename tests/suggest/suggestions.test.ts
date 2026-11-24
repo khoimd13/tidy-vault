@@ -67,5 +67,6 @@ describe('groupSuggestions', () => {
     expect(shots?.suggestions.map((s) => s.item.id)).toEqual(['b', 'a', 'c']);
     expect(shots?.span).toEqual({ from: '2021-06-01', to: '2023-01-01' });
     expect(shots?.topReason).toBe('r');
+    expect(shots?.samples.map((s) => s.item.id)).toEqual(['a', 'c', 'b']);
   });
 });

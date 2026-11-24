@@ -4,13 +4,13 @@ import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage', '.husky'] },
+  { ignores: ['dist', 'node_modules', 'coverage', '.husky', 'public'] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['eslint.config.js'] },
+        projectService: { allowDefaultProject: ['eslint.config.js', 'scripts/*.mjs'] },
         tsconfigRootDir: import.meta.dirname,
       },
       globals: { ...globals.browser, chrome: 'readonly' },
@@ -61,9 +61,17 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.config.ts', '*.config.js', 'eslint.config.js', 'tests/**'],
+    files: [
+      '*.config.ts',
+      '*.config.js',
+      'eslint.config.js',
+      'tests/**',
+      'tests-model/**',
+      'scripts/**',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
-  { files: ['eslint.config.js'], ...tseslint.configs.disableTypeChecked },
+  { files: ['eslint.config.js', 'scripts/**'], ...tseslint.configs.disableTypeChecked },
+  { files: ['tests-model/**', 'scripts/**'], rules: { 'no-console': 'off' } },
   prettier,
 );

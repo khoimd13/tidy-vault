@@ -1,22 +1,33 @@
-/** Local storage for scanned items and decisions (IndexedDB, extension origin only). */
+/** Local storage for scanned items, decisions and image embeddings (IndexedDB, extension only). */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Decision, PhotoItem } from '../shared/types';
+
+export interface StoredEmbedding {
+  id: string;
+  /** Which model produced the vector, so a model change re-analyses photos. */
+  model: string;
+  vec: Float32Array;
+}
 
 interface VaultSchema extends DBSchema {
   items: { key: string; value: PhotoItem };
   decisions: { key: string; value: Decision };
+  embeddings: { key: string; value: StoredEmbedding };
 }
 
 const DB_NAME = 'vault-tidy';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<VaultSchema>> | null = null;
 
 function db(): Promise<IDBPDatabase<VaultSchema>> {
   dbPromise ??= openDB<VaultSchema>(DB_NAME, DB_VERSION, {
-    upgrade(database) {
-      database.createObjectStore('items', { keyPath: 'id' });
-      database.createObjectStore('decisions', { keyPath: 'id' });
+    upgrade(database, oldVersion) {
+      if (oldVersion < 1) {
+        database.createObjectStore('items', { keyPath: 'id' });
+        database.createObjectStore('decisions', { keyPath: 'id' });
+      }
+      if (oldVersion < 2) database.createObjectStore('embeddings', { keyPath: 'id' });
     },
   });
   return dbPromise;
@@ -48,7 +59,23 @@ export async function getDecisions(): Promise<Map<string, Decision>> {
   return new Map(all.map((d) => [d.id, d]));
 }
 
+export async function putEmbeddings(list: readonly StoredEmbedding[]): Promise<void> {
+  if (list.length === 0) return;
+  const tx = (await db()).transaction('embeddings', 'readwrite');
+  await Promise.all([...list.map((e) => tx.store.put(e)), tx.done]);
+}
+
+/** Embeddings made by `model`; vectors from other models are ignored. */
+export async function getEmbeddings(model: string): Promise<Map<string, Float32Array>> {
+  const all = await (await db()).getAll('embeddings');
+  return new Map(all.filter((e) => e.model === model).map((e) => [e.id, e.vec]));
+}
+
 export async function clearAll(): Promise<void> {
   const database = await db();
-  await Promise.all([database.clear('items'), database.clear('decisions')]);
+  await Promise.all([
+    database.clear('items'),
+    database.clear('decisions'),
+    database.clear('embeddings'),
+  ]);
 }

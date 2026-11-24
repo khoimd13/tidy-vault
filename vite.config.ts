@@ -6,4 +6,5 @@ import manifest from './manifest.config.ts';
 export default defineConfig({
   plugins: [preact(), crx({ manifest })],
   build: { target: 'es2022', sourcemap: true },
+  worker: { format: 'es' },
 });

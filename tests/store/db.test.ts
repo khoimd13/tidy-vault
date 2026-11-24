@@ -26,3 +26,17 @@ describe('store', () => {
     expect([...(await store.getDecisions()).keys()]).toEqual(['b']);
   });
 });
+
+describe('embeddings store', () => {
+  it('keeps vectors per model and clears them with everything else', async () => {
+    await store.putEmbeddings([
+      { id: 'a', model: 'm1', vec: new Float32Array([1, 2]) },
+      { id: 'b', model: 'm2', vec: new Float32Array([3, 4]) },
+    ]);
+    const m1 = await store.getEmbeddings('m1');
+    expect([...m1.keys()]).toEqual(['a']);
+    expect(Array.from(m1.get('a') ?? [])).toEqual([1, 2]);
+    await store.clearAll();
+    expect((await store.getEmbeddings('m1')).size).toBe(0);
+  });
+});

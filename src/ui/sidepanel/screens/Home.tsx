@@ -34,6 +34,7 @@ export function Home({ vault, onReview, onCleanup }: Props) {
       )}
 
       <ScanCard vault={vault} />
+      <AiLine vault={vault} />
       {vault.error && (
         <p class="notice" role="alert">
           {vault.error}
@@ -138,7 +139,6 @@ function ScanCard({ vault }: { vault: Vault }) {
 
 function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () => void }) {
   const name = categoryById(group.categoryId)?.name ?? group.categoryId;
-  const samples = group.suggestions.slice(0, 6);
   return (
     <section class="card">
       <h3>
@@ -146,7 +146,7 @@ function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () =
       </h3>
       {group.span && <p class="muted">{formatSpan(group.span)}</p>}
       <div class="strip" aria-hidden="true">
-        {samples.map((s) => (
+        {group.samples.map((s) => (
           <img key={s.item.id} src={s.item.thumbUrl} alt="" loading="lazy" />
         ))}
       </div>
@@ -160,5 +160,46 @@ function GroupCard({ group, onReview }: { group: SuggestionGroup; onReview: () =
         Review
       </button>
     </section>
+  );
+}
+
+/** One quiet line about the AI model: loading, analysing (with progress), done, or unavailable. */
+function AiLine({ vault }: { vault: Vault }) {
+  const { status, progress } = vault.ai;
+  if (status.state === 'unavailable') {
+    return (
+      <p class="notice" title={status.message}>
+        The AI model isn't available, so only screenshot shapes are used. Other categories need it.
+      </p>
+    );
+  }
+  if (status.state === 'loading') {
+    // Saved results already show; only mention loading when there's new work waiting for it.
+    return progress.done < progress.total ? <p class="ai muted">Loading the AI model…</p> : null;
+  }
+  const left = progress.total - progress.done - progress.failed;
+  if (left > 0) {
+    return (
+      <div class="ai">
+        <div class="row">
+          <span>Analysing photos with AI…</span>
+          <span class="muted">
+            {progress.done.toLocaleString()} of {progress.total.toLocaleString()}
+          </span>
+        </div>
+        <progress
+          aria-label="AI analysis progress"
+          value={progress.done}
+          max={Math.max(1, progress.total)}
+        />
+      </div>
+    );
+  }
+  if (progress.done === 0) return null;
+  return (
+    <p class="ai muted">
+      AI analysed {progress.done.toLocaleString()} photos on this computer
+      {progress.failed > 0 && ` (${progress.failed.toLocaleString()} couldn't be loaded)`}.
+    </p>
   );
 }
