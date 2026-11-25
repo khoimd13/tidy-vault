@@ -25,6 +25,8 @@ export interface PanelResponse {
   thumbs?: (string | null)[];
   /** Only on `sizes/fetch`: size and storage taken per media key. */
   sizes?: Record<string, { size: number | null; spaceTaken: number | null }>;
+  /** Only on `sizes/fetch`: why no exact sizes came back, when that happens. */
+  sizesError?: string;
   /** Only on `album/add`. */
   album?:
     | { ok: true; name: string; added: number; verifiedCount: number | null }

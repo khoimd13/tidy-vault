@@ -7,15 +7,18 @@ import type { PhotoItem } from '../../shared/types';
 import * as store from '../../store/db';
 
 /** Asks for a batch of sizes; throws when the tab can't answer right now. */
-export type SizeFetcher = (
-  ids: string[],
-) => Promise<Record<string, { size: number | null; spaceTaken: number | null }>>;
+export type SizeFetcher = (ids: string[]) => Promise<{
+  sizes: Record<string, { size: number | null; spaceTaken: number | null }>;
+  error: string | null;
+}>;
 
 /** Photos per message to the tab (the page script asks Google 100 at a time). */
 const CHUNK = 300;
 
 export function useSizes(items: PhotoItem[], fetchSizes: SizeFetcher | null) {
   const [sizes, setSizes] = useState<Map<string, store.StoredSize>>(new Map());
+  /** Why the last lookup brought nothing back, shown in the panel; null when fine. */
+  const [error, setError] = useState<string | null>(null);
   const sizesRef = useRef(sizes);
   const asked = useRef(new Set<string>());
   const running = useRef(false);
@@ -48,7 +51,8 @@ export function useSizes(items: PhotoItem[], fetchSizes: SizeFetcher | null) {
             for (const id of todo) asked.current.delete(id); // tab gone: retry when it's back
             break;
           }
-          const fresh = Object.entries(reply).map(([id, s]) => ({ id, ...s }));
+          setError(reply.error);
+          const fresh = Object.entries(reply.sizes).map(([id, s]) => ({ id, ...s }));
           if (fresh.length === 0) continue;
           void store.putSizes(fresh);
           sizesRef.current = new Map([
@@ -67,7 +71,8 @@ export function useSizes(items: PhotoItem[], fetchSizes: SizeFetcher | null) {
     asked.current.clear();
     sizesRef.current = new Map();
     setSizes(sizesRef.current);
+    setError(null);
   };
 
-  return { sizes, reset };
+  return { sizes, error, reset };
 }

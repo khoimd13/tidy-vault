@@ -64,9 +64,9 @@ export type AlbumOutcome = NonNullable<PanelResponse['album']>;
 export async function fetchSizesViaTab(
   tabId: number,
   mediaKeys: string[],
-): Promise<NonNullable<PanelResponse['sizes']>> {
+): Promise<{ sizes: NonNullable<PanelResponse['sizes']>; error: string | null }> {
   const res = await sendToTab(tabId, { type: 'sizes/fetch', mediaKeys });
-  return res.sizes ?? {};
+  return { sizes: res.sizes ?? {}, error: res.sizesError ?? null };
 }
 
 /** Asks the Google Photos tab to put these photos in a new private album. */

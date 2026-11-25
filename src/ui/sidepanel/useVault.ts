@@ -309,6 +309,7 @@ export function useVault() {
     ai: { status: ai.status, progress: ai.progress },
     learnedFrom: feedback.decisions,
     sizes: sizes.sizes,
+    sizesError: sizes.error,
     itemCount: items.length,
     itemsById,
     groups,

@@ -63,9 +63,28 @@ if (!alreadyLoaded)
             sourcePath: location.pathname,
             sleep,
           });
-          sendResponse({ ...status(), sizes: Object.fromEntries(sizes) });
-        } catch {
-          sendResponse({ ...status(), sizes: {} });
+          const matched = msg.mediaKeys.filter((k) => sizes.has(k)).length;
+          // Explain an empty or mismatched answer instead of failing silently.
+          const sizesError =
+            matched > 0
+              ? undefined
+              : sizes.size === 0
+                ? `Google returned no sizes for ${msg.mediaKeys.length} photos`
+                : `Google returned ${sizes.size} sizes, but for different photo IDs`;
+          if (sizesError) {
+            console.warn('Vault Tidy: exact sizes', sizesError, {
+              asked: msg.mediaKeys.slice(0, 3),
+              returned: [...sizes.keys()].slice(0, 3),
+            });
+          }
+          sendResponse({
+            ...status(),
+            sizes: Object.fromEntries(sizes),
+            ...(sizesError ? { sizesError } : {}),
+          });
+        } catch (err) {
+          console.warn('Vault Tidy: exact sizes failed', err);
+          sendResponse({ ...status(), sizes: {}, sizesError: String(err) });
         }
       })();
       return true;

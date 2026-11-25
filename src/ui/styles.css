@@ -996,3 +996,7 @@ button.soft:hover:not(:disabled) {
   color: var(--text);
   background: rgb(20 19 26 / 80%);
 }
+
+.size-note {
+  font-size: 11px;
+}

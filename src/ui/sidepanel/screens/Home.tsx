@@ -73,6 +73,11 @@ export function Home({ vault, onReview, onCleanup }: Props) {
                 {t('couldFree', { size: formatSpace(i18n, space) })}
               </span>
             )}
+            {vault.sizesError && !space.exact && (
+              <span class="muted size-note">
+                {t('sizesUnavailable', { reason: vault.sizesError })}
+              </span>
+            )}
             <span class="muted">
               {t('listAndKept', { c: n(vault.counts.clutter), k: n(vault.counts.kept) })}
             </span>
