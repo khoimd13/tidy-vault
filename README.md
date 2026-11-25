@@ -37,7 +37,9 @@ recognises screenshots by their shape.
 
 ## Using it
 
-1. **Find suggestions** scrolls through whatever Google Photos is showing (your library, a
+1. **Find suggestions** scrolls through whatever Google Photos is showing. A scan that stops
+   part-way can be continued later (**Continue scan**); **Check for new photos** scans from the
+   top and stops at photos already scanned. It scrolls through whatever Google Photos is showing (your library, a
    search such as `screenshots`, or an album). The AI then looks at each photo; suggestions
    appear as it goes.
 2. **Review** a group. "Likely clutter" starts selected; untick anything you want to keep.

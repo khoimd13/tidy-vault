@@ -2,7 +2,14 @@
 import { fetchThumbnails, findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
 import { addPhotosToNewAlbum, fetchSizes, readSession } from '../source/googlePhotosApi';
-import { isPanelToContent, type ContentToPanel, type PanelResponse } from '../shared/messages';
+import {
+  SCAN_PROGRESS_KEY,
+  isPanelToContent,
+  type ContentToPanel,
+  type PanelResponse,
+  type ScanMode,
+  type ScanProgress,
+} from '../shared/messages';
 import type { PhotoItem } from '../shared/types';
 
 /** The panel may inject this script again into a tab that already has it; run only once. */
@@ -21,15 +28,43 @@ function send(msg: ContentToPanel): void {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-function start(): void {
+function saveProgress(progress: ScanProgress): void {
+  void chrome.storage.local.set({ [SCAN_PROGRESS_KEY]: progress }).catch(() => undefined);
+}
+
+async function savedProgress(): Promise<ScanProgress | null> {
+  const stored: Record<string, unknown> = await chrome.storage.local.get(SCAN_PROGRESS_KEY);
+  const p = stored[SCAN_PROGRESS_KEY] as ScanProgress | undefined;
+  return p && typeof p.top === 'number' ? p : null;
+}
+
+async function start(mode: ScanMode, knownIds: readonly string[]): Promise<void> {
   if (scanner && (scanner.status === 'running' || scanner.status === 'paused')) return;
   const container = findScrollContainer();
-  container.scrollTo({ top: 0 });
+  const path = location.pathname;
+  const previous = mode === 'resume' ? await savedProgress() : null;
+  // Resume where the last scan of this same view stopped; otherwise start at the top.
+  const resumeAt = previous && previous.path === path && !previous.finished ? previous.top : 0;
+  container.scrollTo({ top: resumeAt });
+  const startedWith = resumeAt > 0 ? (previous?.seen ?? 0) : 0;
 
   const current = new Scanner(
     {
       readItems: () => readVisibleItems(),
       scrollStep: () => container.scrollBy({ top: container.clientHeight * 0.8 }),
+      atEnd: () => container.scrollTop + container.clientHeight >= container.scrollHeight - 4,
+      onStep: () => {
+        // "Check for new photos" doesn't move the bookmark of a full scan.
+        if (mode !== 'new') {
+          saveProgress({
+            path,
+            top: container.scrollTop,
+            finished: false,
+            seen: startedWith + (scanner?.seenCount ?? 0),
+            at: Date.now(),
+          });
+        }
+      },
       sleep,
       onItems: (items) => {
         for (const i of items) found.set(i.id, i);
@@ -37,12 +72,23 @@ function start(): void {
       },
       onProgress: (seen, state) => send({ type: 'scan/progress', seen, state }),
     },
-    DEFAULT_SCAN_OPTIONS,
+    mode === 'new' ? { ...DEFAULT_SCAN_OPTIONS, known: new Set(knownIds) } : DEFAULT_SCAN_OPTIONS,
   );
   scanner = current;
   current
     .run()
-    .then((reason) => send({ type: 'scan/done', seen: current.seenCount, reason }))
+    .then((reason) => {
+      if (reason === 'end' && mode !== 'new') {
+        saveProgress({
+          path,
+          top: container.scrollTop,
+          finished: true,
+          seen: startedWith + current.seenCount,
+          at: Date.now(),
+        });
+      }
+      send({ type: 'scan/done', seen: current.seenCount, reason });
+    })
     .catch((err: unknown) => send({ type: 'scan/error', message: String(err) }));
 }
 
@@ -114,7 +160,7 @@ if (!alreadyLoaded)
       case 'ping':
         break;
       case 'scan/start':
-        start();
+        void start(msg.mode ?? 'full', msg.knownIds ?? []);
         break;
       case 'scan/pause':
         scanner?.pause();

@@ -202,15 +202,33 @@ function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
     );
   }
 
-  // After a scan, reviewing is the main job, so scanning again becomes a quiet secondary action.
+  // After a scan, reviewing is the main job, so the scan controls stay compact.
   if (state === 'done' || state === 'cancelled' || vault.itemCount > 0) {
+    const progress = vault.scanProgress;
+    const unfinished = progress !== null && !progress.finished;
     return (
-      <section class="card row">
+      <section class="card">
         <span class="muted">
-          {looked}
-          {state === 'cancelled' && t('stopped')}
+          {vault.lastScanEnd === 'caught-up'
+            ? t('upToDate')
+            : unfinished
+              ? t('scanPartial', { n: n(progress.seen) })
+              : progress?.finished
+                ? t('scanComplete', { n: n(progress.seen) })
+                : looked}
+          {state === 'cancelled' && vault.lastScanEnd !== 'caught-up' && t('stopped')}
         </span>
-        <button onClick={() => void vault.command('scan/start')}>{t('scanAgain')}</button>
+        <div class="actions">
+          {unfinished && (
+            <button class="primary" onClick={() => void vault.startScan('resume')}>
+              {t('continueScan')}
+            </button>
+          )}
+          <button onClick={() => void vault.startScan('new')}>{t('checkNew')}</button>
+          <button class="link" onClick={() => void vault.startScan('full')}>
+            {t('startOver')}
+          </button>
+        </div>
       </section>
     );
   }
@@ -218,7 +236,7 @@ function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
   return (
     <section class="card">
       <p>{t('scanIntro')}</p>
-      <button class="primary" onClick={() => void vault.command('scan/start')}>
+      <button class="primary" onClick={() => void vault.startScan('full')}>
         {t('findSuggestions')}
       </button>
     </section>

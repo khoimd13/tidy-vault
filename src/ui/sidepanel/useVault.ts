@@ -5,7 +5,13 @@ import { createClipClassifier } from '../../ml/clipClassifier';
 import { findNearDuplicates } from '../../ml/duplicates';
 import { buildFeedback, withFeedback } from '../../ml/feedback';
 import { isEmptyImage } from '../../ml/quality';
-import { isContentToPanel, type PanelToContent } from '../../shared/messages';
+import {
+  SCAN_PROGRESS_KEY,
+  isContentToPanel,
+  type PanelToContent,
+  type ScanMode,
+  type ScanProgress,
+} from '../../shared/messages';
 import type { Decision, DecisionKind, PhotoItem, ScanState, Suggestion } from '../../shared/types';
 import * as store from '../../store/db';
 import { buildCleanupList } from '../../suggest/cleanupList';
@@ -48,6 +54,8 @@ export function useVault() {
   const [tabLoads, setTabLoads] = useState(0);
   const [scan, setScan] = useState<ScanStatus>({ state: 'idle', seen: 0 });
   const [items, setItems] = useState<PhotoItem[]>([]);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const [decisions, setDecisions] = useState<Map<string, Decision>>(new Map());
   const [error, setError] = useState<VaultError | null>(null);
   /** Bumped on every successful ping, so work that stopped while disconnected starts again. */
@@ -98,7 +106,8 @@ export function useVault() {
           setScan({ state: msg.state, seen: msg.seen });
           break;
         case 'scan/done':
-          setScan({ state: msg.reason === 'end' ? 'done' : 'cancelled', seen: msg.seen });
+          setScan({ state: msg.reason === 'cancelled' ? 'cancelled' : 'done', seen: msg.seen });
+          setLastEnd(msg.reason);
           break;
         case 'scan/error':
           setError({ code: 'scanError', detail: msg.message });
@@ -110,10 +119,13 @@ export function useVault() {
   }, [addItems]);
 
   const command = useCallback(
-    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add' | 'sizes/fetch'>) => {
+    async (
+      type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add' | 'sizes/fetch'>,
+      extra: Omit<Extract<PanelToContent, { type: 'scan/start' }>, 'type'> = {},
+    ) => {
       if (tabId === null) return;
       const send = async () => {
-        const res = await sendToTab(tabId, { type });
+        const res = await sendToTab(tabId, type === 'scan/start' ? { type, ...extra } : { type });
         if (!res || typeof res.state !== 'string') throw new Error('The page sent no reply');
         return res;
       };
@@ -140,6 +152,35 @@ export function useVault() {
       }
     },
     [tabId, addItems],
+  );
+
+  /** How the last scan ended, e.g. 'caught-up' after "Check for new photos" found nothing new. */
+  const [lastEnd, setLastEnd] = useState<'end' | 'caught-up' | 'cancelled' | null>(null);
+
+  /** Where the last full scan got to, for "Continue scan" (shared with the page script). */
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+  useEffect(() => {
+    const load = () =>
+      void chrome.storage.local.get(SCAN_PROGRESS_KEY).then((s: Record<string, unknown>) => {
+        setProgress((s[SCAN_PROGRESS_KEY] as ScanProgress | undefined) ?? null);
+      });
+    load();
+    const onChanged = (changes: Record<string, unknown>) => {
+      if (SCAN_PROGRESS_KEY in changes) load();
+    };
+    chrome.storage.onChanged?.addListener(onChanged);
+    return () => chrome.storage.onChanged?.removeListener(onChanged);
+  }, []);
+
+  const startScan = useCallback(
+    (mode: ScanMode) => {
+      setLastEnd(null);
+      return command('scan/start', {
+        mode,
+        ...(mode === 'new' ? { knownIds: itemsRef.current.map((i) => i.id) } : {}),
+      });
+    },
+    [command],
   );
 
   // Connect to the tab: learn its scan state and catch up on items found while the panel was closed.
@@ -306,6 +347,9 @@ export function useVault() {
   return {
     onPhotos: tabId !== null,
     scan,
+    scanProgress: progress,
+    lastScanEnd: lastEnd,
+    startScan,
     ai: { status: ai.status, progress: ai.progress },
     learnedFrom: feedback.decisions,
     sizes: sizes.sizes,

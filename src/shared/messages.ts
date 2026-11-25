@@ -1,9 +1,30 @@
 import type { PhotoItem, ScanState } from './types';
 
+export type ScanMode = 'full' | 'resume' | 'new';
+
+/** Saved in chrome.storage.local after every scan step, so a scan can continue later. */
+export interface ScanProgress {
+  /** The Google Photos view that was being scanned (library, a search, an album). */
+  path: string;
+  /** How far down the grid the scan got, in pixels. */
+  top: number;
+  /** True once the scan reached the end of that view. */
+  finished: boolean;
+  /** Photos found in that scan so far. */
+  seen: number;
+  at: number;
+}
+
+export const SCAN_PROGRESS_KEY = 'scanProgress';
+
 /** Messages the side panel sends to the content script in the Google Photos tab. */
 export type PanelToContent =
   | { type: 'ping' }
-  | { type: 'scan/start' }
+  /**
+   * full: from the top through everything; resume: from where the last scan stopped;
+   * new: from the top until only already-scanned photos appear (`knownIds`).
+   */
+  | { type: 'scan/start'; mode?: ScanMode; knownIds?: string[] }
   | { type: 'scan/pause' }
   | { type: 'scan/resume' }
   | { type: 'scan/cancel' }
@@ -37,7 +58,7 @@ export interface PanelResponse {
 export type ContentToPanel =
   | { type: 'scan/items'; items: PhotoItem[] }
   | { type: 'scan/progress'; seen: number; state: ScanState }
-  | { type: 'scan/done'; seen: number; reason: 'end' | 'cancelled' }
+  | { type: 'scan/done'; seen: number; reason: 'end' | 'caught-up' | 'cancelled' }
   | { type: 'scan/error'; message: string };
 
 const PANEL_TYPES = new Set<string>([
