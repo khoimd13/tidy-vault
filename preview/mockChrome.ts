@@ -138,6 +138,7 @@ function handle(msg: PanelToContent) {
     case 'ping':
     case 'thumbs/fetch':
     case 'album/add':
+    case 'sizes/fetch':
       break;
   }
   return { ok: true, state, seen };
@@ -165,6 +166,14 @@ async function fetchAsDataUrls(urls: string[]): Promise<(string | null)[]> {
 async function respond(msg: PanelToContent) {
   const base = handle(msg);
   if (msg.type === 'thumbs/fetch') return { ...base, thumbs: await fetchAsDataUrls(msg.urls) };
+  if (msg.type === 'sizes/fetch') {
+    // Pretend Google knows the size of every other photo (to show partly-exact totals).
+    const sizes: Record<string, { size: number; spaceTaken: number }> = {};
+    msg.mediaKeys.forEach((id, i) => {
+      if (i % 2 === 0) sizes[id] = { size: 1_800_000 + i * 1000, spaceTaken: 1_800_000 + i * 1000 };
+    });
+    return { ...base, sizes };
+  }
   if (msg.type === 'album/add') {
     // Pretend Google created the album (the preview never talks to Google).
     await new Promise((r) => setTimeout(r, 1200));

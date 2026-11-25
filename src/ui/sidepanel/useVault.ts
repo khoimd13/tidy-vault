@@ -12,6 +12,7 @@ import { buildCleanupList } from '../../suggest/cleanupList';
 import { buildSuggestions, groupSuggestions } from '../../suggest/suggestions';
 import {
   addToNewAlbumViaTab,
+  fetchSizesViaTab,
   fetchThumbsViaTab,
   type AlbumOutcome,
   findPhotosTabId,
@@ -20,6 +21,7 @@ import {
 } from '../lib/chromeApi';
 import { clearThumbCache } from './components/Thumb';
 import { useAnalysis } from './useAnalysis';
+import { useSizes } from './useSizes';
 
 export interface ScanStatus {
   state: ScanState;
@@ -108,7 +110,7 @@ export function useVault() {
   }, [addItems]);
 
   const command = useCallback(
-    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add'>) => {
+    async (type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add' | 'sizes/fetch'>) => {
       if (tabId === null) return;
       const send = async () => {
         const res = await sendToTab(tabId, { type });
@@ -158,6 +160,14 @@ export function useVault() {
     [tabId, connection],
   );
   const ai = useAnalysis(items, fetchThumbs);
+
+  // Exact sizes from Google Photos (read-only), fetched quietly once connected.
+  const fetchSizes = useMemo(
+    () =>
+      tabId === null || connection === 0 ? null : (ids: string[]) => fetchSizesViaTab(tabId, ids),
+    [tabId, connection],
+  );
+  const sizes = useSizes(items, fetchSizes);
 
   // With the AI: only analysed photos are suggested (they appear as analysis runs), so the cruder
   // shape rule never shows wrong suggestions that then disappear. Without it: shape rule only.
@@ -276,6 +286,7 @@ export function useVault() {
     setItems([]);
     setDecisions(new Map());
     ai.reset();
+    sizes.reset();
     clearThumbCache();
   }, [ai.reset]);
 
@@ -297,6 +308,7 @@ export function useVault() {
     scan,
     ai: { status: ai.status, progress: ai.progress },
     learnedFrom: feedback.decisions,
+    sizes: sizes.sizes,
     itemCount: items.length,
     itemsById,
     groups,

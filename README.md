@@ -65,9 +65,12 @@ recognises screenshots by their shape.
 - **Videos:** judged by length (read from the duration on the tile) and their cover frame:
   clips of 3 s or less are likely accidental, screen-like cover frames mean screen recordings,
   and videos of 2 min or more are listed at Low only (often precious).
-- **Space estimate (not measured):** Google doesn't show file sizes on the page, so sizes are
-  assumptions: about 2.5 MB per camera photo, 0.5 MB per screenshot, and 1.5 MB per second of
-  video. The headline only counts High/Medium suggestions.
+- **Space you could free:** exact where possible. The page script reads each photo's real file
+  size and how much it counts against your Google storage, read-only, with the call the Google
+  Photos web app uses for its Info panel (`EWgK9e`). Items stored in the old free "high quality"
+  mode count as 0. Photos without a real number fall back to typical sizes (about 2.5 MB per
+  camera photo, 0.5 MB per screenshot, 1.5 MB per second of video) and the total shows "≈".
+  The headline only counts High/Medium suggestions.
 - **Learning from you:** photos nearly identical to ones you kept stop being suggested, similar
   ones lose confidence, photos like ones you added gain a little, and a category whose
   suggestions you mostly reject becomes more cautious.

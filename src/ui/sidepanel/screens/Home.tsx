@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { categoryById } from '../../../shared/categories';
-import { estimateBytes, formatApproxSize } from '../../../suggest/space';
+import { formatApproxSize, formatExactSize, measureSpace } from '../../../suggest/space';
 import type { SuggestionGroup } from '../../../suggest/suggestions';
 import { useI18n, type I18n } from '../../i18n';
 import {
@@ -44,7 +44,10 @@ export function Home({ vault, onReview, onCleanup }: Props) {
   const total = new Set(all.map((s) => s.item.id)).size;
   // The headline only counts what Vault Tidy actually recommends (High/Medium); Low items such as
   // long videos are often precious, so they don't inflate it. Each card still shows its own size.
-  const bytes = estimateBytes(all.filter((s) => s.confidence !== 'low'));
+  const space = measureSpace(
+    all.filter((s) => s.confidence !== 'low'),
+    vault.sizes,
+  );
   const hasData = vault.itemCount > 0 || vault.counts.clutter > 0 || vault.counts.kept > 0;
 
   // Keep the reminder badge's count current, and clear the badge now the panel is open.
@@ -65,9 +68,9 @@ export function Home({ vault, onReview, onCleanup }: Props) {
         <section class="summary row">
           <div class="stack">
             <strong>{t('toReview', { n: n(total) })}</strong>
-            {bytes > 0 && (
-              <span class="space" title={t('estimateNote')}>
-                {t('couldFree', { size: formatApproxSize(bytes, i18n.locale) })}
+            {space.total > 0 && (
+              <span class="space" title={spaceNote(i18n, space)}>
+                {t('couldFree', { size: formatSpace(i18n, space) })}
               </span>
             )}
             <span class="muted">
@@ -93,6 +96,7 @@ export function Home({ vault, onReview, onCleanup }: Props) {
           key={g.categoryId}
           i18n={i18n}
           group={g}
+          sizes={vault.sizes}
           primary={i === 0}
           onReview={() => onReview(g.categoryId)}
         />
@@ -219,25 +223,26 @@ function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
 interface GroupCardProps {
   i18n: I18n;
   group: SuggestionGroup;
+  sizes: Vault['sizes'];
   /** Only the top group gets the filled button, so the screen isn't a wall of lavender. */
   primary: boolean;
   onReview: () => void;
 }
 
-function GroupCard({ i18n, group, primary, onReview }: GroupCardProps) {
+function GroupCard({ i18n, group, sizes, primary, onReview }: GroupCardProps) {
   const { t, n } = i18n;
   const name = i18n.category(group.categoryId, categoryById(group.categoryId)?.name);
   const reason = group.topReason ? i18n.reason(group.topReason) : null;
-  const bytes = estimateBytes(group.suggestions);
+  const space = measureSpace(group.suggestions, sizes);
   return (
     <section class="card">
       <div class="row">
         <h3>
           {n(group.suggestions.length)} {name.toLowerCase()}
         </h3>
-        {bytes > 0 && (
-          <span class="space" title={t('estimateNote')}>
-            {formatApproxSize(bytes, i18n.locale)}
+        {space.total > 0 && (
+          <span class="space" title={spaceNote(i18n, space)}>
+            {formatSpace(i18n, space)}
           </span>
         )}
       </div>
@@ -272,6 +277,21 @@ function GroupCard({ i18n, group, primary, onReview }: GroupCardProps) {
       </button>
     </section>
   );
+}
+
+type Space = ReturnType<typeof measureSpace>;
+
+/** Exact ("2.4 GB") when every photo has a real size from Google Photos, else "≈ 2.4 GB". */
+function formatSpace(i18n: I18n, space: Space): string {
+  return space.exact
+    ? formatExactSize(space.bytes, i18n.locale)
+    : formatApproxSize(space.bytes, i18n.locale);
+}
+
+function spaceNote(i18n: I18n, space: Space): string {
+  if (space.exact) return i18n.t('sizesExact');
+  if (space.known === 0) return i18n.t('estimateNote');
+  return i18n.t('sizesPartial', { known: i18n.n(space.known), total: i18n.n(space.total) });
 }
 
 /** True when every photo that can be analysed has been (or the AI is off and rules apply). */

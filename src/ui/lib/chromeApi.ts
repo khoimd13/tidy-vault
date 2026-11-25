@@ -60,6 +60,15 @@ export async function injectContentScript(tabId: number): Promise<void> {
 
 export type AlbumOutcome = NonNullable<PanelResponse['album']>;
 
+/** Exact sizes for these photos, looked up in the Google Photos tab (read-only). */
+export async function fetchSizesViaTab(
+  tabId: number,
+  mediaKeys: string[],
+): Promise<NonNullable<PanelResponse['sizes']>> {
+  const res = await sendToTab(tabId, { type: 'sizes/fetch', mediaKeys });
+  return res.sizes ?? {};
+}
+
 /** Asks the Google Photos tab to put these photos in a new private album. */
 export async function addToNewAlbumViaTab(
   tabId: number,

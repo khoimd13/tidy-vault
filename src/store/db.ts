@@ -18,10 +18,18 @@ interface VaultSchema extends DBSchema {
   embeddings: { key: string; value: StoredEmbedding };
   /** Small thumbnails (fetched through the Google Photos tab), so screens can show them. */
   thumbs: { key: string; value: { id: string; blob: Blob } };
+  /** Exact sizes from Google Photos (bytes), so the space estimate can use real numbers. */
+  sizes: { key: string; value: StoredSize };
+}
+
+export interface StoredSize {
+  id: string;
+  size: number | null;
+  spaceTaken: number | null;
 }
 
 const DB_NAME = 'vault-tidy';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<VaultSchema>> | null = null;
 
@@ -34,6 +42,7 @@ function db(): Promise<IDBPDatabase<VaultSchema>> {
       }
       if (oldVersion < 2) database.createObjectStore('embeddings', { keyPath: 'id' });
       if (oldVersion < 3) database.createObjectStore('thumbs', { keyPath: 'id' });
+      if (oldVersion < 4) database.createObjectStore('sizes', { keyPath: 'id' });
     },
   });
   return dbPromise;
@@ -105,6 +114,17 @@ export async function getThumb(id: string): Promise<Blob | null> {
   return (await (await db()).get('thumbs', id))?.blob ?? null;
 }
 
+export async function putSizes(list: readonly StoredSize[]): Promise<void> {
+  if (list.length === 0) return;
+  const tx = (await db()).transaction('sizes', 'readwrite');
+  await Promise.all([...list.map((s) => tx.store.put(s)), tx.done]);
+}
+
+export async function getSizes(): Promise<Map<string, StoredSize>> {
+  const all = await (await db()).getAll('sizes');
+  return new Map(all.map((s) => [s.id, s]));
+}
+
 export async function clearAll(): Promise<void> {
   const database = await db();
   await Promise.all([
@@ -112,5 +132,6 @@ export async function clearAll(): Promise<void> {
     database.clear('decisions'),
     database.clear('embeddings'),
     database.clear('thumbs'),
+    database.clear('sizes'),
   ]);
 }

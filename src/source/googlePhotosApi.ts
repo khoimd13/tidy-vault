@@ -1,5 +1,6 @@
 /**
- * The "to remove" album: the only place Vault Tidy WRITES to Google Photos, and only by creating
+ * Google Photos internal web calls. The "to remove" album is the only place Vault Tidy WRITES to
+ * Google Photos, and only by creating
  * one new private album and adding photos to it. It never deletes, trashes, archives or edits.
  *
  * Google's official API can't add existing photos to an album, so this uses the same internal
@@ -140,4 +141,68 @@ export async function addPhotosToNewAlbum(
     () => null,
   );
   return { albumKey, name, added, verifiedCount: typeof count === 'number' ? count : null };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Exact file sizes (READ-ONLY): the batch media-info call `EWgK9e` the web app uses for its Info
+// panel. For each media key it returns the file size and how much the item really counts against
+// the person's Google storage (items saved in the old free "high quality" mode count as 0).
+
+export interface SizeInfo {
+  /** File size in bytes, or null if Google didn't say. */
+  size: number | null;
+  /** Bytes it counts against Google storage (what deleting it would free), or null. */
+  spaceTaken: number | null;
+}
+
+export const SIZE_BATCH = 100;
+
+/** Request body for the batch media-info call (shape as used by the Google Photos web app). */
+function sizeRequest(keys: readonly string[]): unknown {
+  const fields: unknown[] = new Array<unknown>(36).fill(null);
+  fields[24] = [];
+  fields[35] = [];
+  return [[[keys.map((k) => [k])], [fields]]];
+}
+
+/** Reads `{ mediaKey → SizeInfo }` from a batch media-info reply payload. */
+export function parseSizes(payload: unknown): Map<string, SizeInfo> {
+  const out = new Map<string, SizeInfo>();
+  const rows = at(payload, 0, 1);
+  if (!Array.isArray(rows)) return out;
+  for (const row of rows) {
+    const key = at(row, 0);
+    const info = at(row, 1);
+    if (typeof key !== 'string' || !Array.isArray(info)) continue;
+    const size = info[9] as unknown;
+    const storage = info.at(-1) as unknown;
+    const taken = Array.isArray(storage) ? (storage[1] as unknown) : undefined;
+    out.set(key, {
+      size: typeof size === 'number' ? size : null,
+      spaceTaken: typeof taken === 'number' ? taken : null,
+    });
+  }
+  return out;
+}
+
+/** Looks up exact sizes for these photos, in batches. Read-only: changes nothing. */
+export async function fetchSizes(
+  mediaKeys: readonly string[],
+  deps: Omit<AlbumDeps, 'onProgress'>,
+): Promise<Map<string, SizeInfo>> {
+  const keys = [...new Set(mediaKeys)].filter((k) => MEDIA_KEY.test(k));
+  const out = new Map<string, SizeInfo>();
+  for (let i = 0; i < keys.length; i += SIZE_BATCH) {
+    const batch = keys.slice(i, i + SIZE_BATCH);
+    const payload = await rpc(
+      deps.fetcher,
+      deps.session,
+      'EWgK9e',
+      sizeRequest(batch),
+      deps.sourcePath,
+    );
+    for (const [k, v] of parseSizes(payload)) out.set(k, v);
+    if (i + SIZE_BATCH < keys.length) await deps.sleep(300);
+  }
+  return out;
 }

@@ -1,7 +1,7 @@
 /** Content script on photos.google.com: runs the scanner and streams results to the side panel. */
 import { fetchThumbnails, findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
-import { addPhotosToNewAlbum, readSession } from '../source/googlePhotosApi';
+import { addPhotosToNewAlbum, fetchSizes, readSession } from '../source/googlePhotosApi';
 import { isPanelToContent, type ContentToPanel, type PanelResponse } from '../shared/messages';
 import type { PhotoItem } from '../shared/types';
 
@@ -53,6 +53,23 @@ function status(): PanelResponse {
 if (!alreadyLoaded)
   chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
     if (!isPanelToContent(msg)) return;
+    if (msg.type === 'sizes/fetch') {
+      const scripts = Array.from(document.scripts, (s) => s.textContent ?? '');
+      void (async () => {
+        try {
+          const sizes = await fetchSizes(msg.mediaKeys, {
+            fetcher: (url, init) => fetch(url, init),
+            session: readSession(scripts),
+            sourcePath: location.pathname,
+            sleep,
+          });
+          sendResponse({ ...status(), sizes: Object.fromEntries(sizes) });
+        } catch {
+          sendResponse({ ...status(), sizes: {} });
+        }
+      })();
+      return true;
+    }
     if (msg.type === 'album/add') {
       const scripts = Array.from(document.scripts, (s) => s.textContent ?? '');
       void (async () => {

@@ -48,3 +48,45 @@ export function formatApproxSize(bytes: number, locale?: string): string {
   if (bytes >= 1e6) return `≈ ${fmt(Math.round(bytes / 1e6), 0)} MB`;
   return '< 1 MB';
 }
+
+export interface KnownSize {
+  size: number | null;
+  spaceTaken: number | null;
+}
+
+/**
+ * Space for a set of suggestions, preferring exact numbers from Google Photos: what the photo
+ * counts against storage ("space taken"), else its file size, else the typical-size estimate.
+ * `exact` is true only when every photo counted had a real number.
+ */
+export function measureSpace(
+  suggestions: readonly Suggestion[],
+  sizes: ReadonlyMap<string, KnownSize>,
+): { bytes: number; exact: boolean; known: number; total: number } {
+  const unique = new Map<string, Suggestion>();
+  for (const s of suggestions) if (!unique.has(s.item.id)) unique.set(s.item.id, s);
+  let bytes = 0;
+  let known = 0;
+  for (const [id, s] of unique) {
+    const real = sizes.get(id);
+    const value = real?.spaceTaken ?? real?.size ?? null;
+    if (typeof value === 'number') {
+      bytes += value;
+      known += 1;
+    } else {
+      bytes += estimateBytes([s]);
+    }
+  }
+  return { bytes, exact: known === unique.size && unique.size > 0, known, total: unique.size };
+}
+
+/** Exact sizes: "2.4 GB", "380 MB" (one decimal under 10 MB), no "≈". */
+export function formatExactSize(bytes: number, locale?: string): string {
+  const fmt = (n: number, digits: number) =>
+    n.toLocaleString(locale, { maximumFractionDigits: digits });
+  if (bytes >= 1e9) return `${fmt(bytes / 1e9, 1)} GB`;
+  if (bytes >= 1e7) return `${fmt(bytes / 1e6, 0)} MB`;
+  if (bytes >= 1e6) return `${fmt(bytes / 1e6, 1)} MB`;
+  if (bytes > 0) return `${fmt(Math.max(1, bytes / 1e3), 0)} KB`;
+  return '0 MB';
+}

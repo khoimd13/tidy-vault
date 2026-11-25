@@ -1,6 +1,6 @@
 {
   "name": "vault-tidy",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Suggestion-only cleanup assistant for Google Photos with on-device AI (Chrome extension).",
   "license": "MIT",

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   addPhotosToNewAlbum,
   buildRequest,
+  fetchSizes,
+  parseSizes,
   parseReply,
   readSession,
   type Session,
@@ -103,5 +105,55 @@ describe('addPhotosToNewAlbum', () => {
     const deps = { ...send, session: SESSION, sourcePath: '/', sleep: () => Promise.resolve() };
     await expect(addPhotosToNewAlbum('x', ['bad key!'], deps)).rejects.toThrow('No photos');
     await expect(addPhotosToNewAlbum('x', keys.slice(0, 2), deps)).rejects.toThrow("didn't create");
+  });
+});
+
+describe('exact sizes (read-only)', () => {
+  /** A batch media-info reply row: [key, [.. index 9 = size .., [takesUpSpace, spaceTaken, quality]]]. */
+  const row = (key: string, size: number, taken: number) => {
+    const info: unknown[] = new Array<unknown>(12).fill(null);
+    info[9] = size;
+    info[11] = [1, taken, 2];
+    return [key, info];
+  };
+
+  it('parses size and space taken per photo', () => {
+    const sizes = parseSizes([
+      [null, [row('AF1QipA0000001', 3_200_000, 3_200_000), row('AF1QipB0000001', 2_000_000, 0)]],
+    ]);
+    expect(sizes.get('AF1QipA0000001')).toEqual({ size: 3_200_000, spaceTaken: 3_200_000 });
+    expect(sizes.get('AF1QipB0000001')).toEqual({ size: 2_000_000, spaceTaken: 0 });
+    expect(parseSizes(null).size).toBe(0);
+  });
+
+  it('asks in batches of 100 and only ever reads', async () => {
+    const keys = Array.from({ length: 230 }, (_, i) => `AF1QipSize${String(i).padStart(4, '0')}`);
+    const calls: { rpcid: string; count: number }[] = [];
+    const fetcher = (url: string, init: RequestInit) => {
+      const rpcid = new URL(url).searchParams.get('rpcids') ?? '';
+      const body = typeof init.body === 'string' ? init.body : '';
+      const data = JSON.parse(
+        (
+          JSON.parse(decodeURIComponent(body.split('&')[0]?.slice(6) ?? '')) as string[][][]
+        )[0]?.[0]?.[1] ?? 'null',
+      ) as [[[[string][]]]];
+      const asked = data[0][0][0].map(([k]) => k);
+      calls.push({ rpcid, count: asked.length });
+      return Promise.resolve(
+        new Response(reply(rpcid, [[null, asked.map((k) => row(k, 1000, 500))]])),
+      );
+    };
+    const sizes = await fetchSizes(keys, {
+      fetcher,
+      session: SESSION,
+      sourcePath: '/',
+      sleep: () => Promise.resolve(),
+    });
+    expect(calls).toEqual([
+      { rpcid: 'EWgK9e', count: 100 },
+      { rpcid: 'EWgK9e', count: 100 },
+      { rpcid: 'EWgK9e', count: 30 },
+    ]);
+    expect(sizes.size).toBe(230);
   });
 });
