@@ -14,6 +14,9 @@ clicks.
 - Only reads what photos.google.com shows in your own browser tab.
 - Everything is reversible: Keep, Add to cleanup list and Remove all have Undo.
 
+Vault Tidy is an independent project. It is not affiliated with, endorsed by, or sponsored by
+Google. Google Photos is a trademark of Google LLC.
+
 > Status: **v0.2.** Scan, on-device CLIP classification of five categories, review and cleanup
 > list work end to end. Learning from your choices and face protection are next (see
 > [docs/UX_AND_AI_PLAN.md](docs/UX_AND_AI_PLAN.md)).
@@ -158,7 +161,12 @@ Two rules are enforced by ESLint so the structure stays easy to maintain:
 
 ## Privacy and permissions
 
+The full policy (English and Vietnamese) is in [PRIVACY.md](PRIVACY.md); it is the page to link
+from the Chrome Web Store listing.
+
 - `sidePanel`, `storage`.
+- `scripting`: reconnect to a Google Photos tab that was open before the extension updated.
+- `alarms`: the optional monthly reminder (off by default).
 - `photos.google.com`: to read the photo grid you are looking at.
 - No image-server permission: Google's thumbnails only load with your Google session, so the
   part of Vault Tidy running inside the Google Photos tab downloads the small (224 px)
@@ -178,3 +186,10 @@ in the extension's own IndexedDB on this computer. **Clear local data** wipes th
 - The "to remove" album (beta) uses Google Photos' internal web calls (`OXvT9d` create album,
   `E1Cajb` add, `snAcKc` read back; documented by Google Photos Toolkit). It can break when
   Google changes its site; it then fails safely and the link list and CSV still work.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The extension bundles third-party code, fonts and the CLIP model
+under MIT, ISC, Apache-2.0 and OFL-1.1. `npm run assets` (run before every build) writes their
+license texts to `public/THIRD_PARTY_NOTICES.txt`, which ships in the extension and is linked
+from the panel's settings.

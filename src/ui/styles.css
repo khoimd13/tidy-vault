@@ -1029,6 +1029,21 @@ button.soft:hover:not(:disabled) {
   accent-color: var(--accent);
 }
 
+.settings .row {
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.settings a {
+  color: inherit;
+  font-size: 12px;
+}
+
+.legal {
+  margin: 0;
+  font-size: 11px;
+}
+
 /* ---- Scan loader: photo frames with a sweeping line, gliding band, smooth counter ---- */
 
 .scan-loader {

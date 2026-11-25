@@ -21,6 +21,7 @@ export function Welcome({ onStart }: { onStart: () => void }) {
       >
         {lang === 'vi' ? 'English' : 'Tiếng Việt'}
       </button>
+      <p class="muted legal">{t('notAffiliated')}</p>
     </main>
   );
 }

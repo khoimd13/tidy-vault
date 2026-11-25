@@ -13,6 +13,7 @@ coverage/
 # Bundled at build time, not committed
 public/ort/
 public/models/
+public/THIRD_PARTY_NOTICES.txt
 
 # Local sample images for the AI preview
 preview/samples/

@@ -128,6 +128,8 @@ export function Home({ vault, onReview, onCleanup }: Props) {
   );
 }
 
+const PRIVACY_URL = 'https://github.com/khoimd13/tidy-vault/blob/main/PRIVACY.md';
+
 function Settings({ i18n }: { i18n: I18n }) {
   const { t, lang, setLang } = i18n;
   const [reminder, setReminder] = useState(false);
@@ -156,7 +158,14 @@ function Settings({ i18n }: { i18n: I18n }) {
         >
           {lang === 'vi' ? 'English' : 'Tiếng Việt'}
         </button>
+        <a href={PRIVACY_URL} target="_blank" rel="noreferrer">
+          {t('privacyPolicy')}
+        </a>
+        <a href="/THIRD_PARTY_NOTICES.txt" target="_blank" rel="noreferrer">
+          {t('licenses')}
+        </a>
       </div>
+      <p class="legal">{t('notAffiliated')}</p>
     </section>
   );
 }
