@@ -134,6 +134,7 @@ preview/        Dev-only harness with fake chrome APIs (never shipped)
 tests/          Vitest unit tests, mirroring src/
 tests-model/    Opt-in tests against the real model
 docs/           Build prompt and the UX + AI plan
+store/          Chrome Web Store listing (LISTING.md), images and publishing steps (PUBLISH.md)
 ```
 
 Data flow: **content script** reads tiles → messages → **side panel** stores them →

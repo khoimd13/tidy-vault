@@ -3,10 +3,23 @@ import pkg from './package.json' with { type: 'json' };
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'Vault Tidy',
+  // Store name and summary come from public/_locales/<lang>/messages.json (one per UI language),
+  // so the Chrome Web Store shows them in the visitor's language. Limits: 75 and 132 characters.
+  name: '__MSG_extName__',
+  short_name: 'Vault Tidy',
+  description: '__MSG_extDescription__',
+  default_locale: 'en',
   version: pkg.version,
-  description: pkg.description,
-  action: { default_title: 'Open Vault Tidy' },
+  icons: {
+    16: 'icons/icon-16.png',
+    32: 'icons/icon-32.png',
+    48: 'icons/icon-48.png',
+    128: 'icons/icon-128.png',
+  },
+  action: {
+    default_title: 'Open Vault Tidy',
+    default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' },
+  },
   background: { service_worker: 'src/background/index.ts', type: 'module' },
   side_panel: { default_path: 'src/ui/sidepanel/index.html' },
   content_scripts: [

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – Google 相册 AI 清理助手：重复照片和截图",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "释放 Google 存储空间：本机 AI 帮你找出 Google 相册里的截图、重复照片、模糊照片、收据和表情包。只给建议，绝不自动删除。",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

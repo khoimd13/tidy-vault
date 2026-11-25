@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – KI-Aufräumhilfe für Google Fotos: Duplikate & Screenshots",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Google-Speicher freigeben: KI auf deinem Gerät findet Screenshots, doppelte und unscharfe Fotos, Belege, Memes. Gratis, löscht nie.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

@@ -4,7 +4,8 @@ import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'coverage', '.husky', 'public'] },
+  // store/src: one-off scripts that render the Web Store images (need playwright-core, not shipped).
+  { ignores: ['dist', 'node_modules', 'coverage', '.husky', 'public', 'store/src'] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {

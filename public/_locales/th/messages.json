@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – ล้างรูปใน Google Photos ด้วย AI: รูปซ้ำและภาพหน้าจอ",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "เพิ่มพื้นที่ Google: AI บนเครื่องของคุณช่วยหาภาพหน้าจอ รูปซ้ำ รูปเบลอ ใบเสร็จ และมีมใน Google Photos ไม่ลบอะไรเองเด็ดขาด",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

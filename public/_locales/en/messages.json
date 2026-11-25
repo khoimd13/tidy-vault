@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – AI Cleaner for Google Photos: Duplicates & Screenshots",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Free up Google storage: on-device AI finds screenshots, duplicate and blurry photos, receipts and memes. Private, never deletes.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

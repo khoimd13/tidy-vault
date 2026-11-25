@@ -1,0 +1,313 @@
+<!doctype html>
+<!--
+  Chrome Web Store images for Vault Tidy. Rendered by render.mjs:
+  compose.html?slide=1..5 (1280x800), ?slide=promo (440x280), ?slide=marquee (1400x560).
+  Panels in panels/ are real screenshots of the side panel (UI preview with synthetic sample
+  images from gen-samples.mjs; no real photos). No Google logos or Google colours.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Vault Tidy store image</title>
+    <style>
+      @font-face {
+        font-family: 'Space Grotesk';
+        font-weight: 600;
+        src: url('../../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-600-normal.woff2');
+      }
+      @font-face {
+        font-family: 'Space Grotesk';
+        font-weight: 700;
+        src: url('../../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2');
+      }
+      @font-face {
+        font-family: 'Be Vietnam Pro';
+        font-weight: 400;
+        src: url('../../node_modules/@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-400-normal.woff2');
+      }
+      @font-face {
+        font-family: 'Be Vietnam Pro';
+        font-weight: 500;
+        src: url('../../node_modules/@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-500-normal.woff2');
+      }
+      :root {
+        --bg: #14131a;
+        --card: #1e1c27;
+        --text: #edebf5;
+        --muted: #a9a5bd;
+        --border: #2e2b3b;
+        --accent: #b9a4ff;
+        --pink: #ff9ad5;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      body {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .stage {
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(900px 600px at 78% 30%, rgb(185 164 255 / 22%), transparent 60%),
+          radial-gradient(700px 500px at 10% 110%, rgb(255 154 213 / 12%), transparent 60%),
+          linear-gradient(160deg, #1b1924, #121118 70%);
+      }
+      .library {
+        position: absolute;
+        display: grid;
+        gap: 10px;
+        opacity: 0.13;
+        filter: saturate(0.8);
+        transform: rotate(-8deg);
+      }
+      .library img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 12px;
+      }
+      .shade {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          rgb(18 17 24 / 92%) 0%,
+          rgb(18 17 24 / 70%) 45%,
+          transparent 75%
+        );
+      }
+      .panel {
+        position: absolute;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid #3a3550;
+        box-shadow:
+          0 30px 80px rgb(0 0 0 / 55%),
+          0 0 0 8px rgb(185 164 255 / 6%);
+        background: var(--bg);
+      }
+      .panel img {
+        display: block;
+        width: 100%;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 600;
+        font-size: 26px;
+        letter-spacing: -0.3px;
+      }
+      .brand img {
+        width: 52px;
+        height: 52px;
+        margin: -8px;
+      }
+      h1 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        letter-spacing: -1.5px;
+        line-height: 1.04;
+        margin: 0;
+      }
+      h1 em {
+        font-style: normal;
+        background: linear-gradient(90deg, #d9ccff, var(--accent) 50%, var(--pink));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .sub {
+        color: var(--muted);
+        line-height: 1.5;
+        margin: 0;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .chip {
+        border: 1px solid var(--border);
+        background: rgb(30 28 39 / 85%);
+        border-radius: 999px;
+        padding: 8px 16px;
+        font-size: 17px;
+        font-weight: 500;
+      }
+      .chip b {
+        color: var(--accent);
+        font-weight: 500;
+      }
+      .ticks {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 14px;
+        font-size: 20px;
+      }
+      .ticks li::before {
+        content: '✓';
+        display: inline-grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        margin-right: 14px;
+        border-radius: 50%;
+        background: rgb(185 164 255 / 16%);
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 16px;
+      }
+      .text {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+      }
+      .foot {
+        position: absolute;
+        color: #77738a;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const SAMPLES = [
+        'keep-land-1',
+        'shot-chat-1',
+        'meme-1',
+        'receipt-1',
+        'keep-portrait-1',
+        'blurry-1',
+        'shot-shop-1',
+        'keep-food-1',
+        'trip-lake-a',
+        'whiteboard',
+        'quote-card',
+        'keep-land-3',
+        'shot-settings',
+        'dark-1',
+        'keep-portrait-2',
+        'meme-2',
+        'receipt-2',
+        'keep-land-2',
+        'shot-ticket',
+        'keep-food-2',
+        'document',
+        'portrait-a',
+        'shot-desktop',
+        'meme-3',
+      ];
+      const library = (cols, n, style) =>
+        `<div class="library" style="grid-template-columns:repeat(${cols},120px);${style}">${Array.from(
+          { length: n },
+          (_, i) => `<img src="samples/${SAMPLES[i % SAMPLES.length]}.jpg">`,
+        ).join('')}</div>`;
+      const brand = (size = 26) =>
+        `<div class="brand" style="font-size:${size}px"><img src="../images/icon-128.png" style="width:${size * 2}px;height:${size * 2}px">Vault Tidy</div>`;
+      const panel = (src, x, y, w, extra = '') =>
+        `<div class="panel" style="left:${x}px;top:${y}px;width:${w}px;${extra}"><img src="panels/${src}.png"></div>`;
+      const NOTE = 'Not affiliated with Google. Sample images, no real photos.';
+
+      function slide({ title, sub, body, panels }) {
+        return {
+          w: 1280,
+          h: 800,
+          html: `${library(6, 36, 'left:-60px;top:-80px')}<div class="shade"></div>
+            <div class="text" style="left:84px;top:96px;width:610px;gap:28px">
+              ${brand()}
+              <h1 style="font-size:58px">${title}</h1>
+              <p class="sub" style="font-size:22px">${sub}</p>
+              ${body}
+            </div>
+            ${panels}
+            <div class="foot" style="left:84px;bottom:34px">${NOTE}</div>`,
+        };
+      }
+
+      const SLIDES = {
+        1: slide({
+          title: 'Find the clutter in your <em>Google&nbsp;Photos</em>',
+          sub: 'An on-device AI looks at every photo and groups what you might not need, with the reason for each one.',
+          body: `<div class="chips">
+            <span class="chip">Screenshots</span><span class="chip">Near-duplicates</span>
+            <span class="chip">Blurry &amp; dark</span><span class="chip">Receipts</span>
+            <span class="chip">Memes</span><span class="chip">Accidental shots</span>
+            <span class="chip">Short videos</span><span class="chip">Screen recordings</span></div>`,
+          panels: panel('home', 800, 39, 380),
+        }),
+        2: slide({
+          title: 'Near-duplicates: <em>the sharpest one stays</em>',
+          sub: 'Bursts and repeated shots taken minutes apart are grouped. Vault Tidy keeps the best photo and suggests the rest.',
+          body: `<ul class="ticks"><li>Compares the photos themselves, not file names</li><li>Picks the sharpest photo to keep</li><li>Tap any photo to change its mind</li></ul>`,
+          panels: panel('review-dupes', 800, 39, 380),
+        }),
+        3: slide({
+          title: 'You decide. <em>Nothing is ever deleted.</em>',
+          sub: 'Likely clutter starts selected; untick anything you love. Unsure photos wait for you to tap them.',
+          body: `<ul class="ticks"><li>High, Medium and Low confidence</li><li>Undo for Keep, Add and Remove all</li><li>Keyboard shortcuts and one-by-one mode</li></ul>`,
+          panels: panel('review-shots', 800, 39, 380),
+        }),
+        4: slide({
+          title: 'Remove them yourself, <em>in a few clicks</em>',
+          sub: 'Nothing changes in your library until you act. Copy the links, export a CSV, or gather everything in one private album and delete from there.',
+          body: `<ul class="ticks"><li>Shows how much space you could free</li><li>Undo for Keep, Add and Remove</li><li>Later scans only read new photos</li></ul>`,
+          panels: panel('cleanup', 800, 39, 380),
+        }),
+        5: slide({
+          title: 'Private: the AI runs <em>on your computer</em>',
+          sub: 'The model is built into the extension. No servers, no account, no analytics, no ads. Free and open source.',
+          body: `<div class="chips">
+            <span class="chip">English</span><span class="chip">Tiếng Việt</span><span class="chip">ไทย</span>
+            <span class="chip">Bahasa Indonesia</span><span class="chip">简体中文</span><span class="chip">日本語</span>
+            <span class="chip">한국어</span><span class="chip">Русский</span><span class="chip">Deutsch</span>
+            <span class="chip">Français</span><span class="chip">Español</span><span class="chip">Português</span></div>`,
+          panels:
+            panel('welcome-ja', 820, 40, 340, 'height:236px;transform:rotate(-3deg)') +
+            panel('welcome-vi', 880, 290, 340, 'height:236px;transform:rotate(2deg)') +
+            panel('welcome-de', 800, 540, 340, 'height:236px;transform:rotate(-2deg)'),
+        }),
+        promo: {
+          w: 440,
+          h: 280,
+          html: `${library(4, 16, 'left:150px;top:-70px;opacity:.22')}
+            <div class="text" style="left:32px;top:40px;width:330px;gap:16px">
+              ${brand(30)}
+              <h1 style="font-size:31px;letter-spacing:-0.8px">Clean up your photos with <em>on-device AI</em></h1>
+              <p class="sub" style="font-size:16px">Suggests. Never deletes.</p>
+            </div>`,
+        },
+        marquee: {
+          w: 1400,
+          h: 560,
+          html: `${library(7, 42, 'left:-40px;top:-90px')}<div class="shade"></div>
+            <div class="text" style="left:84px;top:84px;width:640px;gap:26px">
+              ${brand(28)}
+              <h1 style="font-size:52px">Free up storage <em>without losing a memory</em></h1>
+              <p class="sub" style="font-size:22px">Screenshots, near-duplicates, blurry shots and receipts, found by AI on your own computer. You decide; nothing is deleted.</p>
+            </div>
+            ${panel('home', 830, 46, 290, 'transform:rotate(-3deg)')}
+            ${panel('review-dupes', 1070, 70, 290, 'transform:rotate(3deg)')}`,
+        },
+      };
+
+      const key = new URLSearchParams(location.search).get('slide') ?? '1';
+      const s = SLIDES[key];
+      document.getElementById('root').innerHTML =
+        `<div class="stage" style="width:${s.w}px;height:${s.h}px">${s.html}</div>`;
+      document.title = `${s.w}x${s.h}`;
+    </script>
+  </body>
+</html>

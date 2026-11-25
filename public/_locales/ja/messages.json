@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – Google フォトを AI で整理：重複写真とスクリーンショット",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Google の保存容量を空けよう：端末内の AI が Google フォトのスクリーンショット、重複・ブレた写真、レシート、ミーム画像を見つけます。勝手に削除しません。",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

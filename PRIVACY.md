@@ -17,6 +17,10 @@ each item's id, link, date, shape, whether it is a video and how long it is, and
 thumbnail. When you ask for it, it also reads a photo's file size and how much it counts against
 your Google storage, a larger version of a photo, or a video so you can play it in the panel.
 All of this comes from Google Photos itself, through your own signed-in browser session.
+To make those requests, Vault Tidy uses the session values that the Google Photos page itself
+uses for its own requests (such as its anti-forgery token). They are used only in memory, only
+for requests to photos.google.com, and are never stored or sent anywhere else. Vault Tidy never
+sees your password.
 
 ## What Vault Tidy stores, and where
 
@@ -87,7 +91,10 @@ Khi bạn bắt đầu quét, Vault Tidy đọc những gì photos.google.com hi
 của bạn: mã, đường dẫn, ngày, tỉ lệ khung hình của từng mục, có phải video không và dài bao lâu,
 cùng một ảnh thu nhỏ. Khi bạn yêu cầu, Vault Tidy còn đọc dung lượng ảnh và mức ảnh chiếm trong
 bộ nhớ Google, ảnh ở kích thước lớn hơn, hoặc video để phát ngay trong khung. Tất cả đều lấy từ
-chính Google Photos, qua phiên đăng nhập trên trình duyệt của bạn.
+chính Google Photos, qua phiên đăng nhập trên trình duyệt của bạn. Để gửi các yêu cầu đó, Vault Tidy
+dùng các giá trị phiên mà chính trang Google Photos dùng cho yêu cầu của nó (như mã chống giả mạo
+yêu cầu). Các giá trị này chỉ được dùng trong bộ nhớ, chỉ cho yêu cầu tới photos.google.com, và
+không bao giờ được lưu lại hay gửi đi nơi khác. Vault Tidy không bao giờ thấy mật khẩu của bạn.
 
 ## Vault Tidy lưu gì, lưu ở đâu
 
