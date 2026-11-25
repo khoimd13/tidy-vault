@@ -2,7 +2,8 @@
 
 A Chrome extension that **suggests** clutter in your Google Photos library: screenshots,
 shopping pages and product ads, memes, receipts and documents, whiteboards and notes, blurry,
-dark or empty photos, accidental shots, and near-duplicate bursts. An AI
+dark or empty photos, accidental shots, near-duplicate bursts, and videos (short or accidental
+clips, screen recordings, and long videos). An AI
 model running on your own computer looks at each photo. You review the suggestions and decide.
 **It never deletes anything.** The one optional write is the beta "to remove" album: one new
 private album with the photos you confirmed, so you can delete them from Google Photos in a few
@@ -61,6 +62,12 @@ recognises screenshots by their shape.
 - **Near-duplicates:** photos taken within 10 minutes whose image vectors are at least 0.92
   similar form a group; the sharpest is kept and the rest are suggested. Calibrated on
   burst-like copies (`tests-model/duplicates.smoke.test.ts`: 99% caught).
+- **Videos:** judged by length (read from the duration on the tile) and their cover frame:
+  clips of 3 s or less are likely accidental, screen-like cover frames mean screen recordings,
+  and videos of 2 min or more are listed at Low only (often precious).
+- **Space estimate (not measured):** Google doesn't show file sizes on the page, so sizes are
+  assumptions: about 2.5 MB per camera photo, 0.5 MB per screenshot, and 1.5 MB per second of
+  video. The headline only counts High/Medium suggestions.
 - **Learning from you:** photos nearly identical to ones you kept stop being suggested, similar
   ones lose confidence, photos like ones you added gain a little, and a category whose
   suggestions you mostly reject becomes more cautious.

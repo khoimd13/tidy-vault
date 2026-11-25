@@ -17,6 +17,15 @@ describe('estimateBytes', () => {
     expect(estimateBytes([s('a', 'screenshots'), s('a', 'duplicates')])).toBe(500_000);
     expect(estimateBytes([s('x', 'unknown-category')])).toBe(2_000_000);
   });
+
+  it('sizes videos by length (≈ 1.5 MB per second), or 20 MB when unknown', () => {
+    const v = (id: string, durationSec: number | null): Suggestion => ({
+      ...s(id, 'longVideos'),
+      item: photo(id, { kind: 'video', durationSec }),
+    });
+    expect(estimateBytes([v('a', 120)])).toBe(180_000_000);
+    expect(estimateBytes([v('b', null)])).toBe(20_000_000);
+  });
 });
 
 describe('formatApproxSize', () => {

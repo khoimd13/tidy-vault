@@ -1,5 +1,6 @@
 import type { CategoryScore, Confidence, PhotoItem } from '../shared/types';
 import { ageScore, screenShapeScore } from './signals';
+import { videoScores } from './videos';
 
 /**
  * Anything that can score a photo against categories.
@@ -28,7 +29,8 @@ export function toConfidence(score: number, t: Thresholds = DEFAULT_THRESHOLDS):
 /** Screenshots from shape and age alone. Good enough to exercise the whole flow end to end. */
 export const heuristicClassifier: Classifier = {
   score(item, now) {
-    if (item.kind !== 'photo') return [];
+    // Without the image model, videos are judged by length only.
+    if (item.kind === 'video') return videoScores(item, null);
     const shape = screenShapeScore(item.aspect);
     if (shape === 0) return [];
     const age = ageScore(item.takenAt, now);

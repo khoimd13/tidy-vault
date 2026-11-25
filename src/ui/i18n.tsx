@@ -272,6 +272,9 @@ const CATEGORY_VI: Record<string, string> = {
   blurry: 'Ảnh mờ, tối hoặc trống',
   accidental: 'Ảnh chụp nhầm',
   duplicates: 'Ảnh gần giống nhau',
+  shortVideos: 'Video ngắn hoặc quay nhầm',
+  screenRecordings: 'Video quay màn hình',
+  longVideos: 'Video dài',
 };
 
 /** Vietnamese for the AI's descriptions (see shared/categories.ts). */
@@ -325,6 +328,8 @@ const REASON_VI: Record<string, string> = {
   'Keeping the sharpest': 'Giữ ảnh nét nhất',
   'Similar to photos you kept': 'Giống những ảnh bạn đã giữ',
   'Similar to photos you added before': 'Giống những ảnh bạn đã thêm trước đó',
+  'Looks recorded by accident': 'Có vẻ quay nhầm',
+  'Looks like a screen recording': 'Trông giống video quay màn hình',
 };
 
 /** Translates one classifier reason (they are produced in English). */
@@ -337,6 +342,10 @@ export function translateReason(reason: string, lang: Lang): string {
     const prompt = looks[1].charAt(0).toLowerCase() + looks[1].slice(1);
     return `Trông giống ${PROMPT_VI[prompt] ?? prompt}`;
   }
+  const short = /^Only (\d+) seconds long$/.exec(reason);
+  if (short) return `Chỉ dài ${short[1]} giây`;
+  const long = /^Long video \((\d+) min\)$/.exec(reason);
+  if (long) return `Video dài (${long[1]} phút)`;
   const from = /^From (\d{4})$/.exec(reason);
   if (from) return `Từ năm ${from[1]}`;
   const similar = /^Very similar to a photo taken (.+)$/.exec(reason);

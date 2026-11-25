@@ -3,6 +3,7 @@ import { heuristicClassifier, type Classifier } from './classifier';
 import { duplicateScore, type DuplicateMatch } from './duplicates';
 import { isEmptyImage, poorQualityScore, qualityReason, type Quality } from './quality';
 import { ageScore, screenShapeScore } from './signals';
+import { videoScores } from './videos';
 import { zeroShot, type TextBank, type ZeroShotResult } from './zeroShot';
 
 /** What the image model measured for one photo. */
@@ -62,8 +63,15 @@ export function createClipClassifier(
 ): Classifier {
   return {
     score(item, now) {
-      if (item.kind !== 'photo') return [];
       const analysis = analyses.get(item.id);
+      if (item.kind === 'video') {
+        return videoScores(
+          item,
+          analysis
+            ? { results: cachedZeroShot(analysis.vec, bank), quality: analysis.quality }
+            : null,
+        );
+      }
       if (!analysis) return fallback.score(item, now);
 
       const out: CategoryScore[] = [];

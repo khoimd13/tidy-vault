@@ -147,6 +147,39 @@ function thumbUnder(tile: Element): string {
   return '';
 }
 
+const DURATION = /^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})$/;
+
+/** "0:03" → 3, "1:02:05" → 3725; null when it isn't a duration. */
+export function parseDuration(text: string): number | null {
+  const m = DURATION.exec(text.trim());
+  if (!m) return null;
+  return Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+}
+
+/**
+ * The duration badge Google draws on video tiles (e.g. "0:03"), searched like the thumbnail:
+ * in the link first, then in wrappers that hold no other photo.
+ */
+function findDuration(tile: Element): number | null {
+  let scope: Element | null = tile;
+  for (let depth = 0; scope && depth < 4; depth++) {
+    for (const el of Array.from(scope.querySelectorAll('*'))) {
+      if (el.childElementCount > 0) continue;
+      const seconds = parseDuration(el.textContent ?? '');
+      if (seconds !== null) return seconds;
+    }
+    const parent: Element | null = scope.parentElement;
+    if (!parent || parent.querySelectorAll(PHOTO_LINK).length > 1) break;
+    scope = parent;
+  }
+  return null;
+}
+
+function videoInfo(label: string, durationSec: number | null) {
+  const video = /^vid(e|é)o\b/i.test(label.trim()) || durationSec !== null;
+  return video ? { kind: 'video' as const, durationSec } : { kind: 'photo' as const };
+}
+
 export function readTile(tile: HTMLAnchorElement, origin: string): PhotoItem | null {
   const href = tile.getAttribute('href') ?? '';
   const id = parsePhotoId(href);
@@ -161,7 +194,8 @@ export function readTile(tile: HTMLAnchorElement, origin: string): PhotoItem | n
     takenAt: parseLabelDate(label),
     takenTs: parseLabelTimestamp(label),
     aspect: rect.width > 0 && rect.height > 0 ? rect.width / rect.height : null,
-    kind: /^video\b/i.test(label.trim()) ? 'video' : 'photo',
+    // Videos: the label starts with "Video" (English and Vietnamese) or the tile shows a duration.
+    ...videoInfo(label, findDuration(tile)),
     label,
   };
 }

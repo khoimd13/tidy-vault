@@ -17,12 +17,20 @@ export const TYPICAL_BYTES: Record<string, number> = {
   duplicates: 2_500_000,
 };
 const DEFAULT_BYTES = 2_000_000;
+/** Phone video (1080p, H.264/HEVC) is roughly 1–2.5 MB per second; 1.5 MB/s is a middle value. */
+const VIDEO_BYTES_PER_SEC = 1_500_000;
+const DEFAULT_VIDEO_BYTES = 20_000_000;
 
 /** Estimated bytes for a set of suggestions, counting each photo once. */
 export function estimateBytes(suggestions: readonly Suggestion[]): number {
   const seen = new Map<string, number>();
   for (const s of suggestions) {
-    const size = TYPICAL_BYTES[s.categoryId] ?? DEFAULT_BYTES;
+    const size =
+      s.item.kind === 'video'
+        ? typeof s.item.durationSec === 'number'
+          ? s.item.durationSec * VIDEO_BYTES_PER_SEC
+          : DEFAULT_VIDEO_BYTES
+        : (TYPICAL_BYTES[s.categoryId] ?? DEFAULT_BYTES);
     // A photo in several groups is counted once, at its smallest typical size (conservative).
     seen.set(s.item.id, Math.min(seen.get(s.item.id) ?? Infinity, size));
   }

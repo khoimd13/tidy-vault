@@ -16,6 +16,8 @@ export interface PhotoItem {
   /** Tile width / height, or null when the tile had no size. */
   aspect: number | null;
   kind: 'photo' | 'video';
+  /** Video length in seconds, read from the duration shown on the tile; null when unknown. */
+  durationSec?: number | null;
   /** Raw accessible label of the tile, kept for debugging selector changes. */
   label: string;
 }

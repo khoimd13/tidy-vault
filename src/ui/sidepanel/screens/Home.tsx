@@ -11,6 +11,7 @@ import {
   setFlag,
 } from '../../lib/chromeApi';
 import { AiSparkle } from '../components/AiSparkle';
+import { ScanLoader } from '../components/ScanLoader';
 import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
 
@@ -41,7 +42,9 @@ export function Home({ vault, onReview, onCleanup }: Props) {
   // A photo can be in several groups; count it once.
   const all = vault.groups.flatMap((g) => g.suggestions);
   const total = new Set(all.map((s) => s.item.id)).size;
-  const bytes = estimateBytes(all);
+  // The headline only counts what Vault Tidy actually recommends (High/Medium); Low items such as
+  // long videos are often precious, so they don't inflate it. Each card still shows its own size.
+  const bytes = estimateBytes(all.filter((s) => s.confidence !== 'low'));
   const hasData = vault.itemCount > 0 || vault.counts.clutter > 0 || vault.counts.kept > 0;
 
   // Keep the reminder badge's count current, and clear the badge now the panel is open.
@@ -169,15 +172,12 @@ function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
   if (running) {
     return (
       <section class="card">
-        <div class="row">
-          <strong>{state === 'paused' ? t('paused') : t('finding')}</strong>
-          <span class="muted">{looked}</span>
-        </div>
-        {state === 'running' ? (
-          <progress aria-label={t('finding')} />
-        ) : (
-          <progress aria-label={t('paused')} value={0} max={1} />
-        )}
+        <ScanLoader
+          label={state === 'paused' ? t('paused') : t('finding')}
+          count={seen > 0 ? seen : vault.itemCount}
+          countText={(x) => t('lookedAt', { n: n(x) })}
+          paused={state === 'paused'}
+        />
         <div class="actions">
           {state === 'running' ? (
             <button onClick={() => void vault.command('scan/pause')}>{t('pause')}</button>

@@ -258,6 +258,11 @@ function SuggestionTile({ i18n, s, name, on, onToggle, onOpen }: TileProps) {
           onClick={() => onToggle(s.item.id)}
         >
           <Thumb item={s.item} alt={`${name}, ${date}`} />
+          {s.item.kind === 'video' && (
+            <span class="vbadge" aria-hidden="true">
+              ▶ {typeof s.item.durationSec === 'number' ? formatDuration(s.item.durationSec) : ''}
+            </span>
+          )}
           <span class={`chip ${s.confidence}`}>{t(s.confidence)}</span>
           {on && (
             <span class="check" aria-hidden="true">
@@ -571,4 +576,11 @@ function Swipe({ vault, i18n, title, items, onClose }: SwipeProps) {
       )}
     </main>
   );
+}
+
+/** 3 → "0:03", 754 → "12:34". */
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

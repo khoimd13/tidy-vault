@@ -62,7 +62,10 @@ function fakeItem(i: number): PhotoItem {
       thumbUrl: `/samples/${sample.file}`,
       takenAt: `${2019 + (i % 6)}-0${(i % 9) + 1}-15`,
       aspect: sample.aspect,
-      kind: 'photo',
+      // Every 7th sample poses as a video (2 s or 4 min) so video groups can be checked.
+      ...(i % 7 === 3
+        ? { kind: 'video' as const, durationSec: i % 14 === 3 ? 2 : 240 }
+        : { kind: 'photo' as const }),
       label: sample.file,
     };
   }
@@ -85,7 +88,7 @@ function fakeItem(i: number): PhotoItem {
 const listeners = new Set<Listener>();
 const storage = new Map<string, unknown>();
 const TOTAL = samples.length || 240;
-const PER_STEP = 24;
+const PER_STEP = 6;
 
 let state: ScanState = 'idle';
 let seen = 0;

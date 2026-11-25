@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseLabelDate,
+  parseDuration,
   parseLabelTimestamp,
   parsePhotoId,
   readVisibleItems,
@@ -149,5 +150,31 @@ describe('parseLabelTimestamp', () => {
   });
   it('returns null without a time', () => {
     expect(parseLabelTimestamp('Ảnh – 24 thg 11, 2024')).toBeNull();
+  });
+});
+
+describe('videos', () => {
+  it('parses durations', () => {
+    expect(parseDuration('0:03')).toBe(3);
+    expect(parseDuration(' 12:40 ')).toBe(760);
+    expect(parseDuration('1:02:05')).toBe(3725);
+    expect(parseDuration('19:38:50 24 thg 11')).toBeNull();
+  });
+
+  it('reads a video tile with its duration badge', () => {
+    document.body.innerHTML = `
+      <div class="tile">
+        <a href="./photo/VID1" aria-label="Video – Dọc – 10:00:00 2 thg 3, 2023">
+          <div data-latest-bg="https://photos.fife.usercontent.google.com/pw/V=w90-h200-no?authuser=0"></div>
+          <div class="badge"><span>0:03</span></div>
+        </a>
+      </div>
+      <div class="tile">
+        <a href="./photo/PIC1" aria-label="Ảnh – Dọc – 10:00:05 2 thg 3, 2023"></a>
+      </div>`;
+    const [video, picture] = readVisibleItems(document, 'https://photos.google.com');
+    expect(video).toMatchObject({ id: 'VID1', kind: 'video', durationSec: 3 });
+    expect(picture).toMatchObject({ id: 'PIC1', kind: 'photo' });
+    expect(picture && 'durationSec' in picture).toBe(false);
   });
 });

@@ -32,7 +32,8 @@ export type AiStatus =
 /** Downloads thumbnails; null entries are failures. Throws if downloading isn't possible now. */
 export type ThumbFetcher = (urls: string[]) => Promise<(Blob | null)[]>;
 
-const analysable = (i: PhotoItem) => i.kind === 'photo' && i.thumbUrl !== '';
+/** Photos, and videos by their cover frame. */
+const analysable = (i: PhotoItem) => i.thumbUrl !== '';
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**

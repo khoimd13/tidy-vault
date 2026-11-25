@@ -34,6 +34,8 @@ interface Props {
 
 export function Thumb({ item, alt = '' }: Props) {
   const [src, setSrc] = useState<string | null>(null);
+  /** An image that fails to load shows the neutral placeholder, not its alt text. */
+  const [broken, setBroken] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -50,8 +52,8 @@ export function Thumb({ item, alt = '' }: Props) {
   // Preview harness data uses plain local images; real Google links are never loaded here.
   const fallback = item.thumbUrl.startsWith('/') || item.thumbUrl.startsWith('data:');
   const shown = src ?? (fallback ? item.thumbUrl : null);
-  return shown ? (
-    <img src={shown} alt={alt} loading="lazy" />
+  return shown && !broken ? (
+    <img src={shown} alt={alt} loading="lazy" onError={() => setBroken(true)} />
   ) : (
     <span class="thumb-placeholder" role="img" aria-label={alt} />
   );

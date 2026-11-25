@@ -98,6 +98,28 @@ export const CATEGORIES: readonly CategoryDef[] = [
     ],
     needsModel: true,
   },
+  // Videos: judged by length and cover frame, not by a description (see ml/videos.ts).
+  {
+    id: 'shortVideos',
+    name: 'Short or accidental videos',
+    icon: 'video',
+    prompts: [],
+    needsModel: false,
+  },
+  {
+    id: 'screenRecordings',
+    name: 'Screen recordings',
+    icon: 'device-desktop',
+    prompts: [],
+    needsModel: true,
+  },
+  {
+    id: 'longVideos',
+    name: 'Long videos',
+    icon: 'movie',
+    prompts: [],
+    needsModel: false,
+  },
   {
     // Found by comparing photos with each other, not by a description (see ml/duplicates.ts).
     id: 'duplicates',
