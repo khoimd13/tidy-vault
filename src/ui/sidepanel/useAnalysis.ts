@@ -223,7 +223,9 @@ export function useAnalysis(items: PhotoItem[], fetchThumbs: ThumbFetcher | null
       if (embeddings.has(i.id)) done += 1;
       else if (failedUrls.has(i.thumbUrl)) failed += 1;
     }
-    return { done, total: photos.length, failed, noThumbnail };
+    /** Videos analysed (their cover frame), so the panel can show photos and videos apart. */
+    const videosDone = photos.filter((i) => i.kind === 'video' && embeddings.has(i.id)).length;
+    return { done, total: photos.length, failed, noThumbnail, videosDone };
   }, [items, embeddings, failedUrls]);
 
   return { status, bank, embeddings, progress, reset };

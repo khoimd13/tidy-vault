@@ -350,7 +350,10 @@ function AiLine({ vault, i18n }: { vault: Vault; i18n: I18n }) {
   if (progress.done === 0) return null;
   return (
     <p class="ai muted">
-      {t('aiDone', { n: n(progress.done) })}
+      {t('aiDone', {
+        n: n(progress.done - progress.videosDone),
+        v: n(progress.videosDone),
+      })}
       {progress.failed > 0 && t('aiFailed', { n: n(progress.failed) })}.
       {vault.learnedFrom > 0 && t('tuned', { n: n(vault.learnedFrom) })}
     </p>
