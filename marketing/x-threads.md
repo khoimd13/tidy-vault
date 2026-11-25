@@ -22,10 +22,9 @@ Open Google Photos, click the icon, and it groups what it finds:
 
 **3/**
 Privacy, because it's your photos:
-• the CLIP model ships inside the extension
+• the AI is built into the extension
 • no servers, no account, no analytics
 • nothing is uploaded anywhere
-• code is open source (MIT)
 
 **4/**
 You review and decide. Tick what you don't need → cleanup list (links or CSV), or one private "to remove" album (beta) so you can trash them in Google Photos yourself.
@@ -33,12 +32,11 @@ You review and decide. Tick what you don't need → cleanup list (links or CSV),
 Everything has Undo.
 
 **5/**
-Honest bits: it's beta, Chrome on a computer only, ~230 MB (the model is bundled), and it reads the Google Photos site, so it may break when Google changes it.
+Honest bits: it's beta, Chrome on a computer only, ~230 MB (the AI is built in), and it reads the Google Photos site, so it may break when Google changes it.
 
 Not affiliated with Google.
 
 **6/**
 Free in the Chrome Web Store: STORE_URL
-Code: https://github.com/khoimd13/tidy-vault
 
 12 languages, incl. Tiếng Việt. Tell me what it gets wrong 🙏

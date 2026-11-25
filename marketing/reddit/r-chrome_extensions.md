@@ -1,41 +1,34 @@
 # r/chrome_extensions (draft)
 
-Check the sidebar rules and pick the flair for sharing your own extension before posting.
-Attach the demo video or 2–3 screenshots (no Google logo, blur the email).
+Before posting: read the subreddit rules and pick the flair for sharing your own extension.
+Attach the demo video or 2–3 screenshots (no Google logo, blur your email).
 
 ## Title
 
-```
-I made a free extension that finds clutter in Google Photos with an AI model that runs locally (MV3, open source)
-```
+I made a free extension that finds clutter in Google Photos with AI that runs on your computer
 
 ## Body
 
-> Hi all, developer here. Vault Tidy is a side-panel extension for photos.google.com. It
-> scrolls through what you're viewing and suggests screenshots, near-duplicate bursts,
-> blurry/dark shots, receipts, memes, accidental shots and short or long videos. It **never
-> deletes** anything: you review, then remove photos yourself (or let it collect them into one
-> private album, beta).
+> Hi all, I'm the developer. Vault Tidy opens in Chrome's side panel next to Google Photos. It
+> scrolls through what you're viewing and suggests screenshots, near-duplicate bursts, blurry
+> or dark shots, receipts, memes, accidental shots and short or long videos.
 >
-> Some MV3 bits that might help others:
+> It **never deletes** anything. You review, then remove photos yourself (or let it put them
+> into one private album, beta, so you can delete them in a few clicks).
 >
-> - CLIP (8-bit ONNX, ~150 MB) runs with transformers.js in a Web Worker in the side panel,
->   WebGPU with a WASM fallback. CSP is `script-src 'self' 'wasm-unsafe-eval'`; nothing remote
->   is loaded.
-> - No image-host permission: thumbnails need the Google session, so the content script
->   fetches the 224 px thumbnails in the Photos tab and hands them to the panel.
-> - Videos play in the side panel by streaming through the service worker in 1.5 MB pieces,
->   because Google only serves video bytes to its own site.
-> - `scripting` is only used to re-inject into a Photos tab that was open before an update.
->   Permissions are otherwise just `sidePanel`, `storage`, `alarms` (opt-in reminder) and
->   photos.google.com.
+> What I cared about:
 >
-> Stack: Vite + @crxjs, Preact, TypeScript strict. 12 UI languages.
+> - **Private:** the AI is built into the extension and runs on your computer. No account, no
+>   servers, nothing uploaded.
+> - **Few permissions:** only Google Photos, the side panel, local storage, and an optional
+>   monthly reminder.
+> - **Easy review:** keyboard shortcuts, one-by-one mode, Undo everywhere, and videos play in
+>   the panel.
+> - **12 languages.**
 >
-> Honest limits: beta, ~230 MB because the model is bundled, and it depends on Google's web
-> page, so it can break when they change it. Not affiliated with Google.
+> Honest limits: beta, about 230 MB because the AI is built in, and it depends on the Google
+> Photos website, so it can break when Google changes it. Not affiliated with Google.
 >
 > Store: STORE_URL
-> Code (MIT): https://github.com/khoimd13/tidy-vault
 >
-> Feedback on the panel UX or the permission set is very welcome.
+> Feedback on the side panel design is very welcome.

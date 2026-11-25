@@ -30,7 +30,7 @@ trong Google Photos. Ảnh vào thùng rác vẫn khôi phục được trong 60
 
 **Riêng tư** 🔒
 AI chạy ngay trên máy tính của bạn. Không cần tài khoản, không có máy chủ, không thống kê, không
-tải ảnh lên đâu cả. Mã nguồn mở trên GitHub, ai cũng kiểm tra được.
+tải ảnh lên đâu cả.
 
 **Nói trước cho rõ**
 • Đang là bản beta, chỉ chạy trên Chrome máy tính.
@@ -42,7 +42,6 @@ tải ảnh lên đâu cả. Mã nguồn mở trên GitHub, ai cũng kiểm tra 
 Giao diện có tiếng Việt (và 11 ngôn ngữ khác). Hoàn toàn miễn phí.
 
 👉 Cài từ Chrome Web Store: STORE_URL
-💻 Mã nguồn: https://github.com/khoimd13/tidy-vault
 
 Nếu Vault Tidy gợi ý nhầm ảnh nào, comment cho mình biết nhé, đó là góp ý mình cần nhất 🙏
 

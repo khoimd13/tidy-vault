@@ -20,13 +20,12 @@ Recommended: **1**.
 
 ## Topics
 
-Chrome Extensions · Privacy · Photography · Artificial Intelligence · Open Source
+Chrome Extensions · Privacy · Photography · Artificial Intelligence
 
 ## Links
 
 - Website: `https://khoimd13.github.io/tidy-vault/`
 - Chrome Web Store: `STORE_URL`
-- GitHub: https://github.com/khoimd13/tidy-vault
 
 ## Description (≈260 characters)
 
@@ -42,7 +41,7 @@ Chrome Extensions · Privacy · Photography · Artificial Intelligence · Open S
 >
 > **What it does**
 > Open Google Photos, click the Vault Tidy icon, and it scrolls through whatever you're
-> viewing (your library, a search, an album). A CLIP model running _in your browser_ sorts
+> viewing (your library, a search, an album). An AI running _on your computer_ sorts
 > what it finds into groups: screenshots, shopping pages, memes, receipts and documents,
 > whiteboards, blurry/dark/empty shots, accidental shots, near-duplicate bursts (it keeps the
 > sharpest), and short, long or screen-recorded videos. It shows how much space you could
@@ -54,9 +53,8 @@ Chrome Extensions · Privacy · Photography · Artificial Intelligence · Open S
 > remove them in Google Photos in a few clicks. Everything has Undo.
 >
 > **Privacy**
-> No servers, no account, no analytics. The model is bundled in the extension (that's why
-> it's ~230 MB) and nothing is loaded from the internet at runtime. The code is MIT on GitHub,
-> so you can check.
+> No servers, no account, no analytics. The AI is built into the extension (that's why
+> it's ~230 MB), so your photos never leave your computer.
 >
 > **Honest limits**
 > It's beta. It reads the Google Photos web page, so when Google changes its site, parts can

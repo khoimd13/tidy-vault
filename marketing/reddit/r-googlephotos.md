@@ -14,7 +14,7 @@ Made a free tool that suggests screenshots, bursts and blurry shots to clear out
 
 > My storage kept filling up, and most of it wasn't memories: screenshots, 10-shot bursts,
 > pocket videos, photos of receipts. Finding them by hand took forever, so I made a Chrome
-> extension for it. Full disclosure: I'm the developer, it's free and open source.
+> extension for it. Full disclosure: I'm the developer, it's free.
 >
 > **How it works:** open Google Photos on your computer, click the Vault Tidy icon, and it
 > scrolls through what you're viewing (whole library, a search, or an album). It groups what it
@@ -38,6 +38,6 @@ Made a free tool that suggests screenshots, bursts and blurry shots to clear out
 > Google changes the site something may break for a while. Not made by or affiliated with
 > Google.
 >
-> Link: STORE_URL (code: https://github.com/khoimd13/tidy-vault)
+> Link: STORE_URL
 >
 > If it flags something it shouldn't, I'd love to know what kind of photo it was.
