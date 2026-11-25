@@ -11,6 +11,7 @@ import {
   setFlag,
 } from '../../lib/chromeApi';
 import { AiSparkle } from '../components/AiSparkle';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { ScanLoader } from '../components/ScanLoader';
 import { Thumb } from '../components/Thumb';
 import type { Vault } from '../useVault';
@@ -136,7 +137,7 @@ export function Home({ vault, onReview, onCleanup }: Props) {
 const PRIVACY_URL = 'https://github.com/khoimd13/tidy-vault/blob/main/PRIVACY.md';
 
 function Settings({ i18n }: { i18n: I18n }) {
-  const { t, lang, setLang } = i18n;
+  const { t } = i18n;
   const [reminder, setReminder] = useState(false);
   useEffect(() => {
     void getFlag(REMINDER).then(setReminder);
@@ -156,13 +157,7 @@ function Settings({ i18n }: { i18n: I18n }) {
         {t('reminder')}
       </label>
       <div class="row" style={{ justifyContent: 'flex-start' }}>
-        <button
-          class="link"
-          lang={lang === 'vi' ? 'en' : 'vi'}
-          onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-        >
-          {lang === 'vi' ? 'English' : 'Tiếng Việt'}
-        </button>
+        <LanguagePicker />
         <a href={PRIVACY_URL} target="_blank" rel="noreferrer">
           {t('privacyPolicy')}
         </a>
@@ -273,7 +268,7 @@ function GroupCard({ i18n, group, sizes, primary, onReview }: GroupCardProps) {
     <section class="card">
       <div class="row">
         <h3>
-          {n(group.suggestions.length)} {name.toLowerCase()}
+          {n(group.suggestions.length)} {i18n.inline(name)}
         </h3>
         {space.total > 0 && (
           <span class="space" title={spaceNote(i18n, space)}>

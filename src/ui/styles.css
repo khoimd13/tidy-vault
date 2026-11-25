@@ -1185,3 +1185,33 @@ button.soft:hover:not(:disabled) {
   white-space: nowrap;
   min-width: 0;
 }
+
+/* Language picker: a globe and the language's own name, in the footer's quiet style. */
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.language-picker svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.language-picker select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.language-picker select option {
+  background: var(--bg);
+  color: var(--text);
+}

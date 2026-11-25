@@ -1,7 +1,8 @@
 import { useI18n } from '../../i18n';
+import { LanguagePicker } from '../components/LanguagePicker';
 
 export function Welcome({ onStart }: { onStart: () => void }) {
-  const { t, lang, setLang } = useI18n();
+  const { t } = useI18n();
   return (
     <main class="screen welcome">
       <h1 tabIndex={-1}>{t('welcomeTitle')}</h1>
@@ -14,13 +15,7 @@ export function Welcome({ onStart }: { onStart: () => void }) {
       <button class="primary" onClick={onStart}>
         {t('getStarted')}
       </button>
-      <button
-        class="link"
-        lang={lang === 'vi' ? 'en' : 'vi'}
-        onClick={() => setLang(lang === 'vi' ? 'en' : 'vi')}
-      >
-        {lang === 'vi' ? 'English' : 'Tiếng Việt'}
-      </button>
+      <LanguagePicker />
       <p class="muted legal">{t('notAffiliated')}</p>
     </main>
   );

@@ -159,6 +159,14 @@ Two rules are enforced by ESLint so the structure stays easy to maintain:
 - **GitHub Actions** runs `npm run check` and `npm run build` on every push and pull request
   (without the model download).
 
+## Languages
+
+The panel speaks English, Tiếng Việt, ไทย, Bahasa Indonesia, 简体中文, 日本語, 한국어, Русский,
+Deutsch, Français, Español and Português (picker at the bottom of the panel; it starts in the
+browser's language). Each language is one file in `src/ui/locales/`; tests check that every
+string, category, AI description and placeholder is there. Reading dates from the Google Photos
+page still works only when Google Photos itself is in English or Vietnamese.
+
 ## Privacy and permissions
 
 The full policy (English and Vietnamese) is in [PRIVACY.md](PRIVACY.md); it is the page to link
