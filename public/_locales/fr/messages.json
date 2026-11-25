@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – Nettoyeur IA pour Google Photos : doublons et captures",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Libérez du stockage Google : une IA locale repère captures, doublons, photos floues, tickets et mèmes. Gratuit, ne supprime rien.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

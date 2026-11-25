@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – Limpiador con IA para Google Fotos: duplicados y capturas",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Libera espacio en Google: una IA en tu equipo halla capturas, fotos duplicadas y borrosas, recibos y memes. Gratis, nunca borra.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

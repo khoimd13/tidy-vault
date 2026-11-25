@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – Dọn Google Photos bằng AI: ảnh trùng, ảnh chụp màn hình",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Giải phóng bộ nhớ Google: AI ngay trên máy tìm ảnh chụp màn hình, ảnh trùng, ảnh mờ, hoá đơn, meme. Miễn phí, không tự xoá.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Vault Tidy – AI-очистка Google Фото: дубликаты и скриншоты",
+    "description": "Extension name in the Chrome Web Store and on chrome://extensions. Max 75 characters."
+  },
+  "extDescription": {
+    "message": "Освободите место в Google: AI на вашем компьютере найдёт скриншоты, дубликаты, размытые фото, чеки и мемы. Бесплатно, не удаляет.",
+    "description": "Short description (summary) in the Chrome Web Store. Max 132 characters."
+  }
+}
