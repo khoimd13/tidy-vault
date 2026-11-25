@@ -34,6 +34,10 @@ export type PanelToContent =
   | { type: 'thumbs/fetch'; urls: string[] }
   /** Download a video (360p) so the panel can play it; progress arrives as `video/progress`. */
   | { type: 'video/fetch'; id: string; thumbUrl: string }
+  /** Find where a video can be streamed from (link, size, type). */
+  | { type: 'video/open'; thumbUrl: string }
+  /** Read part of a video found with video/open, for the background stream. */
+  | { type: 'video/range'; url: string; start: number; end: number }
   /** Create a new private album with these photos (the only write; never deletes anything). */
   | { type: 'album/add'; name: string; mediaKeys: string[] }
   /** Look up exact file sizes (read-only). */
@@ -50,6 +54,10 @@ export interface PanelResponse {
   thumbs?: (string | null)[];
   /** Only on `video/fetch`: the video as a data: URL, or why there is none. */
   video?: { ok: true; dataUrl: string } | { ok: false; reason: 'unavailable' | 'too-big' };
+  /** Only on `video/open`. */
+  stream?: { url: string; total: number; type: string } | null;
+  /** Only on `video/range`: the bytes, base64-encoded, or null when Google refused. */
+  chunk?: string | null;
   /** Only on `sizes/fetch`: size and storage taken per media key. */
   sizes?: Record<string, { size: number | null; spaceTaken: number | null }>;
   /** Only on `sizes/fetch`: why no exact sizes came back, when that happens. */
@@ -76,6 +84,8 @@ const PANEL_TYPES = new Set<string>([
   'scan/cancel',
   'thumbs/fetch',
   'video/fetch',
+  'video/open',
+  'video/range',
   'album/add',
   'sizes/fetch',
 ]);

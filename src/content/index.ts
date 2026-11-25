@@ -4,6 +4,8 @@ import {
   findScrollContainer,
   readVisibleItems,
   downloadVideo,
+  fetchVideoRange,
+  findVideoStream,
 } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
 import { addPhotosToNewAlbum, fetchSizes, readSession } from '../source/googlePhotosApi';
@@ -245,6 +247,19 @@ if (!alreadyLoaded)
           sendResponse({ ...status(), album: { ok: false, error: String(err) } });
         }
       })();
+      return true;
+    }
+    if (msg.type === 'video/open') {
+      void findVideoStream(msg.thumbUrl).then((stream) => sendResponse({ ...status(), stream }));
+      return true;
+    }
+    if (msg.type === 'video/range') {
+      void fetchVideoRange(msg.url, msg.start, msg.end).then(async (bytes) => {
+        const chunk = bytes
+          ? ((await blobToDataUrl(new Blob([bytes as BlobPart]))).split(',')[1] ?? null)
+          : null;
+        sendResponse({ ...status(), chunk });
+      });
       return true;
     }
     if (msg.type === 'video/fetch') {

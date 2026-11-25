@@ -138,6 +138,8 @@ function handle(msg: PanelToContent) {
     case 'ping':
     case 'thumbs/fetch':
     case 'video/fetch':
+    case 'video/open':
+    case 'video/range':
     case 'album/add':
     case 'sizes/fetch':
       break;
@@ -210,6 +212,8 @@ function makeFakeVideo(): Promise<string | null> {
 
 async function respond(msg: PanelToContent) {
   const base = handle(msg);
+  // No background worker in the preview: say there's no stream, so the panel downloads instead.
+  if (msg.type === 'video/open') return { ...base, stream: null };
   if (msg.type === 'video/fetch') {
     for (const loaded of [1, 2, 3]) {
       await new Promise((r) => setTimeout(r, 300));

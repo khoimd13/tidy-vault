@@ -1,3 +1,4 @@
+import { formatDuration } from '../../lib/format';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { categoryById } from '../../../shared/categories';
@@ -431,6 +432,9 @@ function Detail({
           ))}
         </ul>
         {also.length > 0 && <span class="also">{t('alsoIn', { list: also.join(', ') })}</span>}
+        <a class="detail-open" href={s.item.url} target="_blank" rel="noreferrer">
+          {t('openInPhotos')} ↗
+        </a>
       </div>
       <div class="detail-actions">
         <button disabled={index === 0} onClick={() => onMove(index - 1)} aria-label={t('previous')}>
@@ -439,9 +443,6 @@ function Detail({
         <button class={on ? 'primary' : 'soft'} onClick={() => onToggle(s.item.id)}>
           {on ? `✓ ${t('isSelected')}` : t('select')}
         </button>
-        <a class="button-like" href={s.item.url} target="_blank" rel="noreferrer">
-          {t('openInPhotos')} ↗
-        </a>
         <button
           disabled={index >= list.length - 1}
           onClick={() => onMove(index + 1)}
@@ -582,11 +583,4 @@ function Swipe({ vault, i18n, title, items, onClose }: SwipeProps) {
       )}
     </main>
   );
-}
-
-/** 3 → "0:03", 754 → "12:34". */
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
 }

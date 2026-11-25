@@ -261,8 +261,9 @@ export async function fetchThumbnails(urls: readonly string[]): Promise<(string 
 }
 
 /**
- * Video playback links Google offers, tried in order: 360p, 720p, 1080p. Not every video has
- * every one, and Google's video servers sometimes refuse one but serve another.
+ * Video playback links Google offers: 360p, 720p and 1080p. 1080p (m37) is usually the stored
+ * file and comes fast; the smaller ones are often converted on the fly, which can be slow or fail
+ * outright for long videos. So all are asked at once and the first to answer is used.
  */
 const VIDEO_VARIANTS = ['m18', 'm22', 'm37'] as const;
 
@@ -274,76 +275,119 @@ export function toVideoUrl(thumbUrl: string, variant: string = VIDEO_VARIANTS[0]
   return url.toString();
 }
 
-export type VideoDownload =
-  { ok: true; blob: Blob } | { ok: false; reason: 'unavailable' | 'too-big' };
+/** Google's video servers; only links there are ever fetched for a video's bytes. */
+export function isGoogleVideoUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && /(^|\.)googlevideo\.com$/.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
 
-export interface VideoDownloadOptions {
-  fetcher?: (url: string, init: RequestInit) => Promise<Response>;
-  /** Stop (and say so) once a video turns out bigger than this. */
-  maxBytes?: number;
-  onProgress?: (loaded: number, total: number | null) => void;
-  /** Give up on a link when Google sends nothing for this long (its servers sometimes hang). */
-  stallMs?: number;
+type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
+const defaultFetcher: Fetcher = (u, i) => fetch(u, i);
+
+export interface VideoStream {
+  /** Signed googlevideo.com link; it only answers requests from photos.google.com. */
+  url: string;
+  /** Total size in bytes. */
+  total: number;
+  type: string;
 }
 
 /**
- * Downloads a video from the page, where the Google session applies. Google's video links only
- * answer requests from photos.google.com, so the side panel can't stream them itself.
+ * Finds where a video can be read from: asks every quality at once (two bytes each, with the
+ * page's session) and keeps the first that answers, then asks its total size.
+ */
+export async function findVideoStream(
+  thumbUrl: string,
+  { fetcher = defaultFetcher, timeoutMs = 20_000 }: { fetcher?: Fetcher; timeoutMs?: number } = {},
+): Promise<VideoStream | null> {
+  const urls = VIDEO_VARIANTS.map((v) => toVideoUrl(thumbUrl, v)).filter(Boolean);
+  if (urls.length === 0) return null;
+  const controllers = urls.map(() => new AbortController());
+  const timer = setTimeout(() => controllers.forEach((c) => c.abort()), timeoutMs);
+  try {
+    const winner = await Promise.any(
+      urls.map(async (url, k) => {
+        const res = await fetcher(url, {
+          credentials: 'include',
+          headers: { Range: 'bytes=0-1' },
+          signal: controllers[k]?.signal ?? null,
+        });
+        const type = res.headers.get('content-type') ?? '';
+        if (!res.ok || !type.startsWith('video/') || !isGoogleVideoUrl(res.url)) {
+          throw new Error('not a video');
+        }
+        return { url: res.url, type };
+      }),
+    );
+    controllers.forEach((c) => c.abort());
+    const head = await fetcher(winner.url, { method: 'HEAD', signal: AbortSignal.timeout(10_000) });
+    const total = Number(head.headers.get('content-length'));
+    if (!head.ok || !Number.isFinite(total) || total <= 0) return null;
+    return { url: winner.url, total, type: winner.type };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    controllers.forEach((c) => c.abort());
+  }
+}
+
+/** Reads bytes `start..end` (inclusive) of a video found with findVideoStream. */
+export async function fetchVideoRange(
+  url: string,
+  start: number,
+  end: number,
+  fetcher: Fetcher = defaultFetcher,
+): Promise<Uint8Array | null> {
+  if (!isGoogleVideoUrl(url) || start < 0 || end < start) return null;
+  try {
+    const res = await fetcher(url, {
+      headers: { Range: `bytes=${start}-${end}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status !== 206 && res.status !== 200) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    // A server that ignored the range sent the whole file; cut out the part asked for.
+    return res.status === 200 ? bytes.slice(start, end + 1) : bytes;
+  } catch {
+    return null;
+  }
+}
+
+export type VideoDownload =
+  { ok: true; blob: Blob } | { ok: false; reason: 'unavailable' | 'too-big' };
+
+/**
+ * Downloads a whole (short) video, for when streaming isn't available. Google's video links
+ * only answer requests from photos.google.com, so this runs in the page.
  */
 export async function downloadVideo(
   thumbUrl: string,
   {
-    fetcher = (u, i) => fetch(u, i),
+    fetcher = defaultFetcher,
     maxBytes = 25_000_000,
     onProgress,
-    stallMs = 20_000,
-  }: VideoDownloadOptions = {},
+  }: {
+    fetcher?: Fetcher;
+    maxBytes?: number;
+    onProgress?: (loaded: number, total: number | null) => void;
+  } = {},
 ): Promise<VideoDownload> {
-  for (const variant of VIDEO_VARIANTS) {
-    const url = toVideoUrl(thumbUrl, variant);
-    if (!url) break;
-    const abort = new AbortController();
-    let stall = setTimeout(() => abort.abort(), stallMs);
-    const alive = () => {
-      clearTimeout(stall);
-      stall = setTimeout(() => abort.abort(), stallMs);
-    };
-    try {
-      const res = await fetcher(url, { credentials: 'include', signal: abort.signal });
-      const type = res.headers.get('content-type') ?? '';
-      if (!res.ok || !type.startsWith('video/') || !res.body) {
-        abort.abort();
-        continue;
-      }
-      const length = Number(res.headers.get('content-length'));
-      const total = Number.isFinite(length) && length > 0 ? length : null;
-      if (total !== null && total > maxBytes) {
-        abort.abort();
-        return { ok: false, reason: 'too-big' };
-      }
-      const reader = res.body.getReader();
-      const chunks: Uint8Array<ArrayBuffer>[] = [];
-      let loaded = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        alive();
-        chunks.push(value);
-        loaded += value.byteLength;
-        if (loaded > maxBytes) {
-          abort.abort();
-          return { ok: false, reason: 'too-big' };
-        }
-        onProgress?.(loaded, total);
-      }
-      if (loaded === 0) continue;
-      return { ok: true, blob: new Blob(chunks, { type }) };
-    } catch {
-      abort.abort();
-      // Try the next variant.
-    } finally {
-      clearTimeout(stall);
-    }
+  const stream = await findVideoStream(thumbUrl, { fetcher });
+  if (!stream) return { ok: false, reason: 'unavailable' };
+  if (stream.total > maxBytes) return { ok: false, reason: 'too-big' };
+  const chunks: Uint8Array[] = [];
+  const step = 2_000_000;
+  for (let start = 0; start < stream.total; start += step) {
+    const end = Math.min(stream.total, start + step) - 1;
+    const part = await fetchVideoRange(stream.url, start, end, fetcher);
+    if (!part) return { ok: false, reason: 'unavailable' };
+    chunks.push(part);
+    onProgress?.(end + 1, stream.total);
   }
-  return { ok: false, reason: 'unavailable' };
+  return { ok: true, blob: new Blob(chunks as BlobPart[], { type: stream.type }) };
 }

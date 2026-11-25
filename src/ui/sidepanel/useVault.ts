@@ -21,6 +21,7 @@ import {
   fetchSizesViaTab,
   fetchThumbsViaTab,
   fetchVideoViaTab,
+  openVideoStreamViaTab,
   type AlbumOutcome,
   findPhotosTabId,
   injectContentScript,
@@ -125,9 +126,9 @@ export function useVault() {
 
   const command = useCallback(
     async (
-      type: Exclude<
+      type: Extract<
         PanelToContent['type'],
-        'thumbs/fetch' | 'video/fetch' | 'album/add' | 'sizes/fetch'
+        'ping' | 'scan/start' | 'scan/pause' | 'scan/resume' | 'scan/cancel'
       >,
       extra: Omit<Extract<PanelToContent, { type: 'scan/start' }>, 'type'> = {},
     ) => {
@@ -320,41 +321,57 @@ export function useVault() {
   );
 
   /**
-   * A video to play in the panel, downloaded (360p) through the Google Photos tab: Google only
-   * serves videos to that page. The last few stay in memory so going back and forth is instant.
+   * A video to play in the panel. Google only serves videos to the Google Photos tab, so by
+   * default the background worker streams it through that tab (it starts at once and can seek).
+   * `download` fetches the whole file instead: the fallback for short videos if streaming fails.
+   * The last few are remembered so going back and forth is instant.
    */
-  const videoCache = useRef(new Map<string, Promise<VideoLoad>>());
+  const videoCache = useRef(new Map<string, { at: number; load: Promise<VideoLoad> }>());
   const videoStream = useCallback(
-    (item: PhotoItem, onProgress?: (fraction: number | null) => void): Promise<VideoLoad> => {
-      const cached = videoCache.current.get(item.id);
-      if (cached) return cached;
+    (
+      item: PhotoItem,
+      onProgress?: (fraction: number | null) => void,
+      how: 'stream' | 'download' = 'stream',
+    ): Promise<VideoLoad> => {
+      const key = `${how}:${item.id}`;
+      const cache = videoCache.current;
+      const cached = cache.get(key);
+      // Google's links expire after a few hours; an hour is a safe reuse window.
+      if (cached && Date.now() - cached.at < 60 * 60_000) return cached.load;
       if (tabId === null || item.kind !== 'video' || !item.thumbUrl) {
         return Promise.resolve({ ok: false, reason: 'unavailable' });
       }
-      const onMessage = (msg: unknown, sender: chrome.runtime.MessageSender) => {
-        if (!isContentToPanel(msg) || msg.type !== 'video/progress' || msg.id !== item.id) return;
-        if (sender.tab?.id !== tabId) return;
-        onProgress?.(msg.total ? Math.min(1, msg.loaded / msg.total) : null);
-      };
-      chrome.runtime.onMessage.addListener(onMessage);
-      const loading: Promise<VideoLoad> = fetchVideoViaTab(tabId, item.id, item.thumbUrl)
-        .then((r): VideoLoad => (r.ok ? { ok: true, url: URL.createObjectURL(r.blob) } : r))
-        .catch((): VideoLoad => ({ ok: false, reason: 'no-tab' }))
-        .finally(() => chrome.runtime.onMessage.removeListener(onMessage));
-      const cache = videoCache.current;
-      cache.set(item.id, loading);
-      void loading.then((r) => {
-        // A failure may work later (tab reloaded), so don't keep it.
-        if (!r.ok) cache.delete(item.id);
-      });
-      // Keep memory in check: forget (and free) the oldest videos beyond the last few.
-      while (cache.size > 6) {
-        const [oldId, old] = cache.entries().next().value ?? [];
-        if (oldId === undefined || !old) break;
-        cache.delete(oldId);
-        void old.then((r) => r.ok && URL.revokeObjectURL(r.url));
+      let load: Promise<VideoLoad>;
+      if (how === 'stream') {
+        load = openVideoStreamViaTab(tabId, item.thumbUrl).catch((): VideoLoad => ({
+          ok: false,
+          reason: 'no-tab',
+        }));
+      } else {
+        const onMessage = (msg: unknown, sender: chrome.runtime.MessageSender) => {
+          if (!isContentToPanel(msg) || msg.type !== 'video/progress' || msg.id !== item.id) return;
+          if (sender.tab?.id !== tabId) return;
+          onProgress?.(msg.total ? Math.min(1, msg.loaded / msg.total) : null);
+        };
+        chrome.runtime.onMessage.addListener(onMessage);
+        load = fetchVideoViaTab(tabId, item.id, item.thumbUrl)
+          .then((r): VideoLoad => (r.ok ? { ok: true, url: URL.createObjectURL(r.blob) } : r))
+          .catch((): VideoLoad => ({ ok: false, reason: 'no-tab' }))
+          .finally(() => chrome.runtime.onMessage.removeListener(onMessage));
       }
-      return loading;
+      cache.set(key, { at: Date.now(), load });
+      void load.then((r) => {
+        // A failure may work later (tab reloaded), so don't keep it.
+        if (!r.ok) cache.delete(key);
+      });
+      // Keep memory in check: forget (and free) the oldest beyond the last few.
+      while (cache.size > 8) {
+        const [oldKey, old] = cache.entries().next().value ?? [];
+        if (oldKey === undefined || !old) break;
+        cache.delete(oldKey);
+        void old.load.then((r) => r.ok && r.url.startsWith('blob:') && URL.revokeObjectURL(r.url));
+      }
+      return load;
     },
     [tabId],
   );

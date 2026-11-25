@@ -2,6 +2,8 @@
  * Service worker: opens the side panel from the toolbar icon, and runs the optional monthly
  * reminder (a small count on the icon when photos are waiting to be reviewed).
  */
+import { listenForVideoStreams } from './videoStream';
+
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err: unknown) => {
   console.error('Vault Tidy: could not set side panel behaviour', err);
 });
@@ -30,3 +32,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       await chrome.action.setBadgeText({ text: count > 99 ? '99+' : String(count) });
     });
 });
+
+// Plays videos in the side panel (Google only serves them to the Google Photos tab).
+listenForVideoStreams();

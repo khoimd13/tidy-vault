@@ -75,11 +75,14 @@ recognises screenshots by their shape.
   clips of 3 s or less are likely accidental, screen-like cover frames mean screen recordings,
   and videos of 2 min or more are listed at Low only (often precious).
 - **Playing videos:** the detail view and swipe mode have a ▶ button. Google only serves video
-  files to photos.google.com itself, so the page script downloads the 360p version (falling back
-  to 720p/1080p when Google refuses one) and hands it to the panel, with a progress bar. Google
-  converts while sending, so it takes about half the video's length (a 20 s clip ≈ 10 s). Videos
-  over 25 MB (about 8 minutes) aren't played here; "Open in Google Photos" is offered instead.
-  The last few played videos stay in memory; nothing is stored.
+  files to photos.google.com itself, so the panel's player is fed by the extension's background
+  worker (`vt-stream/<token>`), which reads each piece (1.5 MB) through the Google Photos tab.
+  Playback starts after the first piece and seeking works, even for long videos. All qualities
+  (360p/720p/1080p) are asked at once and the first to answer wins: 1080p is usually the stored
+  file and answers in under a second, while the smaller ones are converted on the fly and can
+  take long or fail. Google's video servers take 5–15 s the first time a video is asked for, so
+  the lookup starts as soon as a video is shown in the detail view, before ▶ is pressed. If
+  streaming fails, videos up to 3 min are downloaded whole instead (with a progress bar).
 - **Space you could free:** exact where possible. The page script reads each photo's real file
   size and how much it counts against your Google storage, read-only, with the call the Google
   Photos web app uses for its Info panel (`EWgK9e`). Items stored in the old free "high quality"

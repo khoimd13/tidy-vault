@@ -715,11 +715,22 @@ button.soft:hover:not(:disabled) {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgb(14 13 19 / 97%);
+  gap: 14px;
+  padding: 14px 16px 18px;
+  /* Solid, so the grid underneath never shows through. */
+  background: var(--bg);
   overflow-y: auto;
-  animation: fade-in 150ms ease-out;
+}
+
+.detail > * {
+  animation: detail-in 180ms ease-out;
+}
+
+@keyframes detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .detail-top button.link {
@@ -728,17 +739,14 @@ button.soft:hover:not(:disabled) {
 }
 
 .large-photo {
+  position: relative;
   border-radius: var(--radius);
   overflow: hidden;
-  background: #0e0d13;
+  background: #0b0a10;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 240px;
-}
-
-.large-photo {
-  position: relative;
 }
 
 .large-photo video {
@@ -748,42 +756,69 @@ button.soft:hover:not(:disabled) {
   background: #000;
 }
 
+/* A gentle shade so the play button and labels read on any frame. */
+.large-photo.is-video::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgb(0 0 0 / 28%), rgb(0 0 0 / 0%) 60%);
+  pointer-events: none;
+}
+
 .play-video {
   position: absolute;
+  z-index: 1;
   top: 50%;
   left: 50%;
   translate: -50% -50%;
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
+  padding: 0;
+  border: none;
   border-radius: 50%;
-  border: 1px solid rgb(255 255 255 / 35%);
-  background: rgb(20 19 26 / 70%);
-  backdrop-filter: blur(6px);
-  color: var(--text);
-  font-size: 24px;
-  padding-left: 5px;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow:
+    0 0 0 6px rgb(185 164 255 / 22%),
+    0 8px 24px rgb(0 0 0 / 45%);
   cursor: pointer;
   display: grid;
   place-items: center;
   transition:
     transform 0.15s ease,
-    background 0.15s ease;
+    box-shadow 0.15s ease;
+}
+
+.play-video svg {
+  width: 30px;
+  height: 30px;
+  margin-left: 4px;
+  fill: currentColor;
 }
 
 .play-video:hover:not(:disabled) {
-  transform: scale(1.08);
-  background: var(--accent);
-  color: var(--on-accent);
+  transform: scale(1.07);
+  box-shadow:
+    0 0 0 9px rgb(185 164 255 / 26%),
+    0 10px 28px rgb(0 0 0 / 50%);
 }
 
-.play-spinner {
-  width: 22px;
-  height: 22px;
-  margin-left: -5px;
+/* Loading: the button stays put and a ring turns around it. */
+.play-video.loading,
+.play-video:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.play-video.loading::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
   border-radius: 50%;
-  border: 2px solid rgb(255 255 255 / 25%);
+  border: 3px solid transparent;
   border-top-color: var(--accent);
-  animation: play-spin 0.8s linear infinite;
+  border-right-color: var(--accent);
+  animation: play-spin 0.9s linear infinite;
 }
 
 @keyframes play-spin {
@@ -792,11 +827,42 @@ button.soft:hover:not(:disabled) {
   }
 }
 
-.video-progress {
+@media (prefers-reduced-motion: reduce) {
+  .play-video.loading::before {
+    animation-duration: 3s;
+  }
+}
+
+.video-length {
   position: absolute;
+  z-index: 1;
+  right: 10px;
+  bottom: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(11 10 16 / 78%);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.video-status {
+  position: absolute;
+  z-index: 1;
   left: 14px;
   right: 14px;
-  bottom: 14px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 70%);
+}
+
+.video-progress {
+  align-self: stretch;
   height: 4px;
   border-radius: 2px;
   background: rgb(255 255 255 / 18%);
@@ -812,13 +878,25 @@ button.soft:hover:not(:disabled) {
 
 .video-failed {
   position: absolute;
+  z-index: 1;
   inset: auto 10px 10px;
   margin: 0;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  background: rgb(20 19 26 / 85%);
+  background: rgb(11 10 16 / 88%);
   font-size: 13px;
   color: var(--muted);
+}
+
+.detail-open {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.detail-open:hover {
+  text-decoration: underline;
 }
 
 .large-photo img,
@@ -852,8 +930,7 @@ button.soft:hover:not(:disabled) {
   align-items: center;
 }
 
-.detail-actions > :nth-child(2),
-.detail-actions > :nth-child(3) {
+.detail-actions > :nth-child(2) {
   flex: 1;
   text-align: center;
 }

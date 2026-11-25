@@ -1,5 +1,6 @@
 /** Thin wrappers around extension APIs used by the UI, so screens stay simple. */
 import type { PanelResponse, PanelToContent } from '../../shared/messages';
+import { STREAM_KEY, STREAM_PATH, type StreamInfo } from '../../shared/videoStream';
 
 export const PHOTOS_ORIGIN = 'https://photos.google.com/';
 
@@ -61,6 +62,22 @@ export async function fetchVideoViaTab(
   if (!video.ok) return video;
   if (!video.dataUrl.startsWith('data:video/')) return { ok: false, reason: 'unavailable' };
   return { ok: true, blob: await (await fetch(video.dataUrl)).blob() };
+}
+
+/**
+ * Gets a video ready to stream: the Google Photos tab finds where Google serves it, and the
+ * background worker plays it to the panel from an extension address (see shared/videoStream).
+ */
+export async function openVideoStreamViaTab(
+  tabId: number,
+  thumbUrl: string,
+): Promise<{ ok: true; url: string } | { ok: false; reason: 'unavailable' }> {
+  const res = await sendToTab(tabId, { type: 'video/open', thumbUrl });
+  if (!res.stream) return { ok: false, reason: 'unavailable' };
+  const token = crypto.randomUUID();
+  const info: StreamInfo = { tabId, ...res.stream };
+  await chrome.storage.session.set({ [`${STREAM_KEY}${token}`]: info });
+  return { ok: true, url: chrome.runtime.getURL(`${STREAM_PATH.slice(1)}${token}`) };
 }
 
 /**
