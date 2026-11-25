@@ -6,7 +6,9 @@ import {
   parseLabelTimestamp,
   parsePhotoId,
   readVisibleItems,
+  downloadVideo,
   toSizedThumb,
+  toVideoUrl,
 } from '../../src/source/googlePhotosDom';
 
 describe('parsePhotoId', () => {
@@ -176,5 +178,96 @@ describe('videos', () => {
     expect(video).toMatchObject({ id: 'VID1', kind: 'video', durationSec: 3 });
     expect(picture).toMatchObject({ id: 'PIC1', kind: 'photo' });
     expect(picture && 'durationSec' in picture).toBe(false);
+  });
+});
+
+describe('video playback', () => {
+  const thumb = 'https://photos.fife.usercontent.google.com/pw/AP1GczAbc=w224-h224?authuser=0';
+
+  it('builds playback links and keeps the query', () => {
+    expect(toVideoUrl(thumb)).toBe(
+      'https://photos.fife.usercontent.google.com/pw/AP1GczAbc=m18?authuser=0',
+    );
+    expect(toVideoUrl(thumb, 'm22')).toContain('=m22?authuser=0');
+    expect(toVideoUrl('https://evil.example/x=w1-h1')).toBe('');
+  });
+
+  const video = (bytes: number, type = 'video/mp4', status = 200, length = true) =>
+    Promise.resolve(
+      new Response(new Uint8Array(bytes), {
+        status,
+        headers: { 'content-type': type, ...(length ? { 'content-length': String(bytes) } : {}) },
+      }),
+    );
+
+  it('downloads the video with the page session and reports progress', async () => {
+    const asked: { url: string; init: RequestInit }[] = [];
+    const progress: (number | null)[] = [];
+    const result = await downloadVideo(thumb, {
+      fetcher: (url, init) => {
+        asked.push({ url, init });
+        return video(1000);
+      },
+      onProgress: (loaded, total) => progress.push(total && loaded / total),
+    });
+    expect(result.ok && result.blob.size).toBe(1000);
+    expect(result.ok && result.blob.type).toBe('video/mp4');
+    expect(asked[0]?.url).toContain('=m18');
+    expect(asked[0]?.init.credentials).toBe('include');
+    expect(progress.at(-1)).toBe(1);
+  });
+
+  it('falls back to another quality when Google refuses one', async () => {
+    const asked: string[] = [];
+    const result = await downloadVideo(thumb, {
+      fetcher: (url) => {
+        asked.push(url);
+        if (url.includes('=m18')) return video(0, 'text/plain', 500);
+        if (url.includes('=m22')) return Promise.reject(new Error('timeout'));
+        return video(10);
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(asked.map((u) => /=(m\d+)/.exec(u)?.[1])).toEqual(['m18', 'm22', 'm37']);
+  });
+
+  it('gives up on a link that hangs and tries the next one', async () => {
+    const asked: string[] = [];
+    const result = await downloadVideo(thumb, {
+      stallMs: 20,
+      fetcher: (url, init) => {
+        asked.push(url);
+        if (!url.includes('=m18')) return video(10);
+        // Never answers until aborted.
+        return new Promise((_, reject) =>
+          init.signal?.addEventListener('abort', () => reject(new Error('aborted'))),
+        );
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(asked).toHaveLength(2);
+  });
+
+  it('stops on videos that are too big, with or without a stated size', async () => {
+    expect(await downloadVideo(thumb, { fetcher: () => video(500), maxBytes: 100 })).toEqual({
+      ok: false,
+      reason: 'too-big',
+    });
+    const unsized = await downloadVideo(thumb, {
+      fetcher: () => video(500, 'video/mp4', 200, false),
+      maxBytes: 100,
+    });
+    expect(unsized).toEqual({ ok: false, reason: 'too-big' });
+  });
+
+  it('says unavailable when nothing is a video', async () => {
+    expect(await downloadVideo(thumb, { fetcher: () => video(10, 'text/html') })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+    expect(await downloadVideo('', { fetcher: () => video(10) })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
   });
 });

@@ -67,6 +67,12 @@ recognises screenshots by their shape.
 - **Videos:** judged by length (read from the duration on the tile) and their cover frame:
   clips of 3 s or less are likely accidental, screen-like cover frames mean screen recordings,
   and videos of 2 min or more are listed at Low only (often precious).
+- **Playing videos:** the detail view and swipe mode have a ▶ button. Google only serves video
+  files to photos.google.com itself, so the page script downloads the 360p version (falling back
+  to 720p/1080p when Google refuses one) and hands it to the panel, with a progress bar. Google
+  converts while sending, so it takes about half the video's length (a 20 s clip ≈ 10 s). Videos
+  over 25 MB (about 8 minutes) aren't played here; "Open in Google Photos" is offered instead.
+  The last few played videos stay in memory; nothing is stored.
 - **Space you could free:** exact where possible. The page script reads each photo's real file
   size and how much it counts against your Google storage, read-only, with the call the Google
   Photos web app uses for its Info panel (`EWgK9e`). Items stored in the old free "high quality"

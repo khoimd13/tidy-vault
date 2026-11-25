@@ -30,6 +30,8 @@ export type PanelToContent =
   | { type: 'scan/cancel' }
   /** Download thumbnails in the page, where the Google session applies. */
   | { type: 'thumbs/fetch'; urls: string[] }
+  /** Download a video (360p) so the panel can play it; progress arrives as `video/progress`. */
+  | { type: 'video/fetch'; id: string; thumbUrl: string }
   /** Create a new private album with these photos (the only write; never deletes anything). */
   | { type: 'album/add'; name: string; mediaKeys: string[] }
   /** Look up exact file sizes (read-only). */
@@ -44,6 +46,8 @@ export interface PanelResponse {
   items?: PhotoItem[];
   /** Only on `thumbs/fetch`: a data: URL per requested URL, or null when it failed. */
   thumbs?: (string | null)[];
+  /** Only on `video/fetch`: the video as a data: URL, or why there is none. */
+  video?: { ok: true; dataUrl: string } | { ok: false; reason: 'unavailable' | 'too-big' };
   /** Only on `sizes/fetch`: size and storage taken per media key. */
   sizes?: Record<string, { size: number | null; spaceTaken: number | null }>;
   /** Only on `sizes/fetch`: why no exact sizes came back, when that happens. */
@@ -59,7 +63,8 @@ export type ContentToPanel =
   | { type: 'scan/items'; items: PhotoItem[] }
   | { type: 'scan/progress'; seen: number; state: ScanState }
   | { type: 'scan/done'; seen: number; reason: 'end' | 'caught-up' | 'cancelled' }
-  | { type: 'scan/error'; message: string };
+  | { type: 'scan/error'; message: string }
+  | { type: 'video/progress'; id: string; loaded: number; total: number | null };
 
 const PANEL_TYPES = new Set<string>([
   'ping',
@@ -68,10 +73,17 @@ const PANEL_TYPES = new Set<string>([
   'scan/resume',
   'scan/cancel',
   'thumbs/fetch',
+  'video/fetch',
   'album/add',
   'sizes/fetch',
 ]);
-const CONTENT_TYPES = new Set<string>(['scan/items', 'scan/progress', 'scan/done', 'scan/error']);
+const CONTENT_TYPES = new Set<string>([
+  'scan/items',
+  'scan/progress',
+  'scan/done',
+  'scan/error',
+  'video/progress',
+]);
 
 function typeOf(msg: unknown): string | null {
   if (typeof msg !== 'object' || msg === null || !('type' in msg)) return null;

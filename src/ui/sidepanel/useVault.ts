@@ -20,6 +20,7 @@ import {
   addToNewAlbumViaTab,
   fetchSizesViaTab,
   fetchThumbsViaTab,
+  fetchVideoViaTab,
   type AlbumOutcome,
   findPhotosTabId,
   injectContentScript,
@@ -28,6 +29,10 @@ import {
 import { clearThumbCache } from './components/Thumb';
 import { useAnalysis } from './useAnalysis';
 import { useSizes } from './useSizes';
+
+/** A video ready to play (an object URL), or why it can't be played here. */
+export type VideoLoad =
+  { ok: true; url: string } | { ok: false; reason: 'unavailable' | 'too-big' | 'no-tab' };
 
 export interface ScanStatus {
   state: ScanState;
@@ -120,7 +125,10 @@ export function useVault() {
 
   const command = useCallback(
     async (
-      type: Exclude<PanelToContent['type'], 'thumbs/fetch' | 'album/add' | 'sizes/fetch'>,
+      type: Exclude<
+        PanelToContent['type'],
+        'thumbs/fetch' | 'video/fetch' | 'album/add' | 'sizes/fetch'
+      >,
       extra: Omit<Extract<PanelToContent, { type: 'scan/start' }>, 'type'> = {},
     ) => {
       if (tabId === null) return;
@@ -298,12 +306,52 @@ export function useVault() {
     (item: PhotoItem): Promise<string | null> => {
       const cached = largeCache.current.get(item.id);
       if (cached) return cached;
-      if (tabId === null || !/=wd+-hd+/.test(item.thumbUrl)) return Promise.resolve(null);
-      const url = item.thumbUrl.replace(/=wd+-hd+/, '=w1200-h1200');
+      if (tabId === null || !/=w\d+-h\d+/.test(item.thumbUrl)) return Promise.resolve(null);
+      const url = item.thumbUrl.replace(/=w\d+-h\d+/, '=w1200-h1200');
       const loading = fetchThumbsViaTab(tabId, [url])
         .then(([blob]) => (blob ? URL.createObjectURL(blob) : null))
         .catch(() => null);
       largeCache.current.set(item.id, loading);
+      return loading;
+    },
+    [tabId],
+  );
+
+  /**
+   * A video to play in the panel, downloaded (360p) through the Google Photos tab: Google only
+   * serves videos to that page. The last few stay in memory so going back and forth is instant.
+   */
+  const videoCache = useRef(new Map<string, Promise<VideoLoad>>());
+  const videoStream = useCallback(
+    (item: PhotoItem, onProgress?: (fraction: number | null) => void): Promise<VideoLoad> => {
+      const cached = videoCache.current.get(item.id);
+      if (cached) return cached;
+      if (tabId === null || item.kind !== 'video' || !item.thumbUrl) {
+        return Promise.resolve({ ok: false, reason: 'unavailable' });
+      }
+      const onMessage = (msg: unknown, sender: chrome.runtime.MessageSender) => {
+        if (!isContentToPanel(msg) || msg.type !== 'video/progress' || msg.id !== item.id) return;
+        if (sender.tab?.id !== tabId) return;
+        onProgress?.(msg.total ? Math.min(1, msg.loaded / msg.total) : null);
+      };
+      chrome.runtime.onMessage.addListener(onMessage);
+      const loading: Promise<VideoLoad> = fetchVideoViaTab(tabId, item.id, item.thumbUrl)
+        .then((r): VideoLoad => (r.ok ? { ok: true, url: URL.createObjectURL(r.blob) } : r))
+        .catch((): VideoLoad => ({ ok: false, reason: 'no-tab' }))
+        .finally(() => chrome.runtime.onMessage.removeListener(onMessage));
+      const cache = videoCache.current;
+      cache.set(item.id, loading);
+      void loading.then((r) => {
+        // A failure may work later (tab reloaded), so don't keep it.
+        if (!r.ok) cache.delete(item.id);
+      });
+      // Keep memory in check: forget (and free) the oldest videos beyond the last few.
+      while (cache.size > 6) {
+        const [oldId, old] = cache.entries().next().value ?? [];
+        if (oldId === undefined || !old) break;
+        cache.delete(oldId);
+        void old.then((r) => r.ok && URL.revokeObjectURL(r.url));
+      }
       return loading;
     },
     [tabId],
@@ -365,6 +413,7 @@ export function useVault() {
     restore,
     makeAlbum,
     largeImage,
+    videoStream,
     isDecided: (id: string) => decisions.has(id),
     undo,
     clearAll,

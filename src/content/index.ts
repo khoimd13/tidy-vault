@@ -1,5 +1,10 @@
 /** Content script on photos.google.com: runs the scanner and streams results to the side panel. */
-import { fetchThumbnails, findScrollContainer, readVisibleItems } from '../source/googlePhotosDom';
+import {
+  fetchThumbnails,
+  findScrollContainer,
+  readVisibleItems,
+  downloadVideo,
+} from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
 import { addPhotosToNewAlbum, fetchSizes, readSession } from '../source/googlePhotosApi';
 import {
@@ -27,6 +32,18 @@ function send(msg: ContentToPanel): void {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === 'string'
+        ? resolve(reader.result)
+        : reject(new Error('Could not read the video'));
+    reader.onerror = () => reject(new Error('Could not read the video'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 function saveProgress(progress: ScanProgress): void {
   void chrome.storage.local.set({ [SCAN_PROGRESS_KEY]: progress }).catch(() => undefined);
@@ -149,6 +166,25 @@ if (!alreadyLoaded)
         } catch (err) {
           sendResponse({ ...status(), album: { ok: false, error: String(err) } });
         }
+      })();
+      return true;
+    }
+    if (msg.type === 'video/fetch') {
+      const { id, thumbUrl } = msg;
+      let lastSent = 0;
+      void (async () => {
+        const result = await downloadVideo(thumbUrl, {
+          onProgress: (loaded, total) => {
+            // A few updates a second is plenty for a progress bar.
+            if (Date.now() - lastSent < 250) return;
+            lastSent = Date.now();
+            send({ type: 'video/progress', id, loaded, total });
+          },
+        });
+        const video = result.ok
+          ? { ok: true as const, dataUrl: await blobToDataUrl(result.blob) }
+          : result;
+        sendResponse({ ...status(), video });
       })();
       return true;
     }

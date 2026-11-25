@@ -46,6 +46,23 @@ export async function fetchThumbsViaTab(tabId: number, urls: string[]): Promise<
   );
 }
 
+export type VideoResult =
+  { ok: true; blob: Blob } | { ok: false; reason: 'unavailable' | 'too-big' | 'no-tab' };
+
+/** Downloads a video through the Google Photos tab (Google only serves it to that page). */
+export async function fetchVideoViaTab(
+  tabId: number,
+  id: string,
+  thumbUrl: string,
+): Promise<VideoResult> {
+  const res = await sendToTab(tabId, { type: 'video/fetch', id, thumbUrl });
+  const video = res.video;
+  if (!video) return { ok: false, reason: 'no-tab' };
+  if (!video.ok) return video;
+  if (!video.dataUrl.startsWith('data:video/')) return { ok: false, reason: 'unavailable' };
+  return { ok: true, blob: await (await fetch(video.dataUrl)).blob() };
+}
+
 /**
  * Puts Vault Tidy's page script into the tab. Needed when the tab was already open before the
  * extension was installed or reloaded (Chrome only adds content scripts to pages loaded later).

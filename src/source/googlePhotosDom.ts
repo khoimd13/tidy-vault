@@ -259,3 +259,91 @@ export async function fetchThumbnails(urls: readonly string[]): Promise<(string 
     }),
   );
 }
+
+/**
+ * Video playback links Google offers, tried in order: 360p, 720p, 1080p. Not every video has
+ * every one, and Google's video servers sometimes refuse one but serve another.
+ */
+const VIDEO_VARIANTS = ['m18', 'm22', 'm37'] as const;
+
+/** A video playback link built from its thumbnail link (`…=w224-h224` → `…=m18`). */
+export function toVideoUrl(thumbUrl: string, variant: string = VIDEO_VARIANTS[0]): string {
+  if (!isGoogleImageUrl(thumbUrl)) return '';
+  const url = new URL(thumbUrl);
+  url.pathname = `${url.pathname.replace(/=[^/=]*$/, '')}=${variant}`;
+  return url.toString();
+}
+
+export type VideoDownload =
+  { ok: true; blob: Blob } | { ok: false; reason: 'unavailable' | 'too-big' };
+
+export interface VideoDownloadOptions {
+  fetcher?: (url: string, init: RequestInit) => Promise<Response>;
+  /** Stop (and say so) once a video turns out bigger than this. */
+  maxBytes?: number;
+  onProgress?: (loaded: number, total: number | null) => void;
+  /** Give up on a link when Google sends nothing for this long (its servers sometimes hang). */
+  stallMs?: number;
+}
+
+/**
+ * Downloads a video from the page, where the Google session applies. Google's video links only
+ * answer requests from photos.google.com, so the side panel can't stream them itself.
+ */
+export async function downloadVideo(
+  thumbUrl: string,
+  {
+    fetcher = (u, i) => fetch(u, i),
+    maxBytes = 25_000_000,
+    onProgress,
+    stallMs = 20_000,
+  }: VideoDownloadOptions = {},
+): Promise<VideoDownload> {
+  for (const variant of VIDEO_VARIANTS) {
+    const url = toVideoUrl(thumbUrl, variant);
+    if (!url) break;
+    const abort = new AbortController();
+    let stall = setTimeout(() => abort.abort(), stallMs);
+    const alive = () => {
+      clearTimeout(stall);
+      stall = setTimeout(() => abort.abort(), stallMs);
+    };
+    try {
+      const res = await fetcher(url, { credentials: 'include', signal: abort.signal });
+      const type = res.headers.get('content-type') ?? '';
+      if (!res.ok || !type.startsWith('video/') || !res.body) {
+        abort.abort();
+        continue;
+      }
+      const length = Number(res.headers.get('content-length'));
+      const total = Number.isFinite(length) && length > 0 ? length : null;
+      if (total !== null && total > maxBytes) {
+        abort.abort();
+        return { ok: false, reason: 'too-big' };
+      }
+      const reader = res.body.getReader();
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      let loaded = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        alive();
+        chunks.push(value);
+        loaded += value.byteLength;
+        if (loaded > maxBytes) {
+          abort.abort();
+          return { ok: false, reason: 'too-big' };
+        }
+        onProgress?.(loaded, total);
+      }
+      if (loaded === 0) continue;
+      return { ok: true, blob: new Blob(chunks, { type }) };
+    } catch {
+      abort.abort();
+      // Try the next variant.
+    } finally {
+      clearTimeout(stall);
+    }
+  }
+  return { ok: false, reason: 'unavailable' };
+}

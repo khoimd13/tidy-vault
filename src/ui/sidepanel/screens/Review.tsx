@@ -414,7 +414,12 @@ function Detail({
           ✕
         </button>
       </div>
-      <LargePhoto item={s.item} alt={`${name}, ${date}`} loadLarge={vault.largeImage} />
+      <LargePhoto
+        item={s.item}
+        alt={`${name}, ${date}`}
+        loadLarge={vault.largeImage}
+        loadVideo={vault.videoStream}
+      />
       <div class="detail-info stack">
         <div class="row">
           <strong>{date}</strong>
@@ -544,6 +549,7 @@ function Swipe({ vault, i18n, title, items, onClose }: SwipeProps) {
               item={s.item}
               alt={`${title}, ${s.item.takenAt ?? t('unknownDate')}`}
               loadLarge={vault.largeImage}
+              loadVideo={vault.videoStream}
             />
             {leaning && (
               <span class={`swipe-stamp ${leaning}`}>

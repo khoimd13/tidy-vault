@@ -137,6 +137,7 @@ function handle(msg: PanelToContent) {
       break;
     case 'ping':
     case 'thumbs/fetch':
+    case 'video/fetch':
     case 'album/add':
     case 'sizes/fetch':
       break;
@@ -163,8 +164,63 @@ async function fetchAsDataUrls(urls: string[]): Promise<(string | null)[]> {
   );
 }
 
+/**
+ * Stands in for Google's video stream: records a short canvas animation once (the preview never
+ * talks to Google) and hands it back as a data: URL, with a few progress updates like the page.
+ */
+let fakeVideo: Promise<string | null> | null = null;
+function makeFakeVideo(): Promise<string | null> {
+  fakeVideo ??= new Promise((resolve) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 360;
+      canvas.height = 640;
+      const ctx = canvas.getContext('2d');
+      if (!ctx || typeof MediaRecorder === 'undefined') return resolve(null);
+      const recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm' });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(new Blob(chunks, { type: 'video/webm' }));
+      };
+      const started = performance.now();
+      const draw = () => {
+        const t = (performance.now() - started) / 1000;
+        ctx.fillStyle = '#1e1c27';
+        ctx.fillRect(0, 0, 360, 640);
+        ctx.fillStyle = '#b9a4ff';
+        ctx.beginPath();
+        ctx.arc(180 + Math.sin(t * 3) * 120, 320, 40, 0, Math.PI * 2);
+        ctx.fill();
+        // Timers (not animation frames) so it also finishes when the page is in the background.
+        if (t < 2) setTimeout(draw, 33);
+        else recorder.stop();
+      };
+      recorder.start();
+      draw();
+    } catch {
+      resolve(null);
+    }
+  });
+  return fakeVideo;
+}
+
 async function respond(msg: PanelToContent) {
   const base = handle(msg);
+  if (msg.type === 'video/fetch') {
+    for (const loaded of [1, 2, 3]) {
+      await new Promise((r) => setTimeout(r, 300));
+      emit({ type: 'video/progress', id: msg.id, loaded, total: 4 });
+    }
+    const dataUrl = await makeFakeVideo();
+    return {
+      ...base,
+      video: dataUrl ? { ok: true, dataUrl } : { ok: false, reason: 'unavailable' },
+    };
+  }
   if (msg.type === 'thumbs/fetch') return { ...base, thumbs: await fetchAsDataUrls(msg.urls) };
   if (msg.type === 'sizes/fetch') {
     // Pretend Google knows the size of every other photo (to show partly-exact totals).
