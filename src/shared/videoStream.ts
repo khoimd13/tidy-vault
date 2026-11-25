@@ -51,3 +51,34 @@ export function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
+
+/**
+ * Bytes `start..end` as a stream that reads one piece at a time (via `read`) only as the reader
+ * wants more, one piece ahead. Throws inside the stream if a piece can't be read.
+ */
+export function pieceStream(
+  start: number,
+  end: number,
+  read: (from: number, to: number) => Promise<Uint8Array | null>,
+  chunk = STREAM_CHUNK,
+): ReadableStream<Uint8Array> {
+  let pos = start;
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        if (pos > end) {
+          controller.close();
+          return;
+        }
+        const piece = await read(pos, Math.min(end, pos + chunk - 1));
+        if (!piece || piece.byteLength === 0) {
+          controller.error(new Error('Google stopped sending the video'));
+          return;
+        }
+        pos += piece.byteLength;
+        controller.enqueue(piece);
+      },
+    },
+    { highWaterMark: 1 },
+  );
+}
