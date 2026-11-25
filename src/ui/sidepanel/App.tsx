@@ -26,30 +26,27 @@ const WELCOMED = 'welcomed';
  */
 export function App() {
   const toast = useToast();
-  /** null while loading; `switched` once the panel moved to another account's results. */
-  const [account, setAccount] = useState<{ value: PageAccount | null; switched: boolean } | null>(
-    null,
-  );
+  /** null while loading. */
+  const [account, setAccount] = useState<{ value: PageAccount | null } | null>(null);
 
   useEffect(() => {
     void (async () => {
       const last = await lastAccount();
       if (last) await openAccount(last);
-      setAccount({ value: last, switched: false });
+      setAccount({ value: last });
     })();
   }, []);
 
   const onAccount = useCallback(
     (next: PageAccount) => {
       void (async () => {
-        const hadOne = Boolean(account?.value);
         await openAccount(next);
         clearThumbCache();
         toast.hide(); // its Undo belongs to the other account
-        setAccount({ value: next, switched: hadOne });
+        setAccount({ value: next });
       })();
     },
-    [account, toast],
+    [toast],
   );
 
   if (!account) return null;
@@ -57,7 +54,6 @@ export function App() {
     <VaultApp
       key={account.value?.id ?? 'none'}
       account={account.value}
-      switched={account.switched}
       onAccount={onAccount}
       toast={toast}
     />
@@ -66,12 +62,10 @@ export function App() {
 
 function VaultApp({
   account,
-  switched,
   onAccount,
   toast,
 }: {
   account: PageAccount | null;
-  switched: boolean;
   onAccount: (account: PageAccount) => void;
   toast: ToastApi;
 }) {
@@ -109,7 +103,6 @@ function VaultApp({
       content = (
         <Home
           vault={vault}
-          switched={switched}
           onReview={(categoryId) => setScreen({ name: 'review', categoryId })}
           onCleanup={() => setScreen({ name: 'cleanup' })}
         />

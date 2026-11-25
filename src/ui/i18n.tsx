@@ -23,9 +23,6 @@ const en = {
   privacyPolicy: 'Privacy policy',
   licenses: 'Licenses',
   accountTitle: 'The Google account these results belong to',
-  switchedAccount:
-    "Google Photos is now signed in to {email}, so you are seeing that account's results. The other account's results are kept.",
-  anotherAccount: 'another account',
   // Home
   suggestions: 'Suggestions',
   toReview: '{n} to review',
@@ -176,9 +173,6 @@ const vi: Record<Key, string> = {
   privacyPolicy: 'Chính sách quyền riêng tư',
   licenses: 'Giấy phép',
   accountTitle: 'Tài khoản Google của các kết quả này',
-  switchedAccount:
-    'Google Photos đang đăng nhập {email}, nên đây là kết quả của tài khoản đó. Kết quả của tài khoản kia vẫn được giữ lại.',
-  anotherAccount: 'tài khoản khác',
   suggestions: 'Gợi ý',
   toReview: '{n} ảnh cần xem',
   listAndKept: '{c} ảnh trong danh sách dọn · {k} ảnh giữ lại',

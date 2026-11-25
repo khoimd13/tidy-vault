@@ -181,8 +181,8 @@ in the extension's own IndexedDB on this computer. **Clear local data** wipes th
 Each Google account keeps its own results: the page script reads which account is signed in
 (`S06Grb` and `oPEP7c` in the page's `WIZ_global_data`), and the panel uses one database
 and one scan bookmark per account (`src/ui/lib/accounts.ts`). When the Google Photos tab is
-signed in to another account, the panel switches to that account's results and says so; the
-other account's results are kept. Results saved before v0.12 go to the first account seen.
+signed in to another account, the panel switches to that account's results (its email shows
+at the top); the other account's results are kept. Results saved before v0.12 go to the first account seen.
 
 ## Known limits
 

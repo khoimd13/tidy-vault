@@ -17,8 +17,6 @@ import type { Vault } from '../useVault';
 
 interface Props {
   vault: Vault;
-  /** The Google Photos tab was signed in to another account, so its results are shown now. */
-  switched?: boolean;
   onReview: (categoryId: string) => void;
   onCleanup: () => void;
 }
@@ -38,7 +36,7 @@ function span(i18n: I18n, s: { from: string; to: string }): string {
   return from === to ? i18n.t('mostlyOne', { m: from }) : i18n.t('mostly', { from, to });
 }
 
-export function Home({ vault, switched = false, onReview, onCleanup }: Props) {
+export function Home({ vault, onReview, onCleanup }: Props) {
   const i18n = useI18n();
   const { t, n } = i18n;
   // A photo can be in several groups; count it once.
@@ -70,12 +68,6 @@ export function Home({ vault, switched = false, onReview, onCleanup }: Props) {
           </span>
         )}
       </header>
-
-      {switched && (
-        <p class="notice" role="status">
-          {t('switchedAccount', { email: vault.account?.email ?? t('anotherAccount') })}
-        </p>
-      )}
 
       {hasData && (
         <section class="summary row">
