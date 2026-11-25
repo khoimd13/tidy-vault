@@ -219,16 +219,14 @@ function ScanCard({ vault, i18n }: { vault: Vault; i18n: I18n }) {
           {state === 'cancelled' && vault.lastScanEnd !== 'caught-up' && t('stopped')}
         </span>
         <div class="actions">
-          {unfinished && (
-            <button class="primary" onClick={() => void vault.startScan('resume')}>
-              {t('continueScan')}
-            </button>
-          )}
-          <button onClick={() => void vault.startScan('new')}>{t('checkNew')}</button>
+          <button class="primary" onClick={() => void vault.startScan('update')}>
+            {t('scanChanges')}
+          </button>
           <button class="link" onClick={() => void vault.startScan('full')}>
             {t('startOver')}
           </button>
         </div>
+        <p class="hint muted">{t(unfinished ? 'scanChangesHintPartial' : 'scanChangesHint')}</p>
       </section>
     );
   }

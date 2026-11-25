@@ -1,6 +1,11 @@
 import type { PhotoItem, ScanState } from './types';
 
-export type ScanMode = 'full' | 'resume' | 'new';
+/**
+ * full: from the top through everything; resume: from where the last scan stopped; new: from the
+ * top until only already-scanned photos appear; update: `new`, then jump to where the last full
+ * scan stopped and finish it (only what wasn't scanned yet).
+ */
+export type ScanMode = 'full' | 'resume' | 'new' | 'update';
 
 /** Saved in chrome.storage.local after every scan step, so a scan can continue later. */
 export interface ScanProgress {
@@ -20,10 +25,7 @@ export const SCAN_PROGRESS_KEY = 'scanProgress';
 /** Messages the side panel sends to the content script in the Google Photos tab. */
 export type PanelToContent =
   | { type: 'ping' }
-  /**
-   * full: from the top through everything; resume: from where the last scan stopped;
-   * new: from the top until only already-scanned photos appear (`knownIds`).
-   */
+  /** See ScanMode. `knownIds`: photos scanned before, for new/update. */
   | { type: 'scan/start'; mode?: ScanMode; knownIds?: string[] }
   | { type: 'scan/pause' }
   | { type: 'scan/resume' }

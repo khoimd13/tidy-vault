@@ -37,11 +37,18 @@ recognises screenshots by their shape.
 
 ## Using it
 
-1. **Find suggestions** scrolls through whatever Google Photos is showing. A scan that stops
-   part-way can be continued later (**Continue scan**); **Check for new photos** scans from the
-   top and stops at photos already scanned. It scrolls through whatever Google Photos is showing (your library, a
+1. **Find suggestions** scrolls through whatever Google Photos is showing (your library, a
    search such as `screenshots`, or an album). The AI then looks at each photo; suggestions
-   appear as it goes.
+   appear as it goes. Afterwards, **Scan for changes** skips what was already scanned: it reads
+   from the top (newest first) until it reaches photos it already has, and if an earlier scan
+   stopped part-way it then jumps straight to that spot and finishes the rest. **Start over**
+   rescans everything. Photos already analysed are never analysed again (their thumbnails and AI
+   results are saved on this computer).
+
+   Why it jumps instead of scrolling fast: Google draws the grid in pieces as you scroll, and
+   hurrying past known photos missed 7–12% of tiles in testing (a new photo could hide there).
+   Jumping to a saved spot is safe: Google draws it fully within about 1.5 s.
+
 2. **Review** a group. "Likely clutter" starts selected; untick anything you want to keep.
    "Not sure" photos are only added if you tap them. Shortcuts: Y add, K keep, A all, Esc back.
 3. **Cleanup list** holds what you confirmed. Copy the links or export a CSV, then remove the

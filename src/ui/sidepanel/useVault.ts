@@ -185,7 +185,9 @@ export function useVault() {
       setLastEnd(null);
       return command('scan/start', {
         mode,
-        ...(mode === 'new' ? { knownIds: itemsRef.current.map((i) => i.id) } : {}),
+        ...(mode === 'new' || mode === 'update'
+          ? { knownIds: itemsRef.current.map((i) => i.id) }
+          : {}),
       });
     },
     [command],

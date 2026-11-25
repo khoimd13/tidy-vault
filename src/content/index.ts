@@ -55,58 +55,136 @@ async function savedProgress(): Promise<ScanProgress | null> {
   return p && typeof p.top === 'number' ? p : null;
 }
 
-async function start(mode: ScanMode, knownIds: readonly string[]): Promise<void> {
-  if (scanner && (scanner.status === 'running' || scanner.status === 'paused')) return;
-  const container = findScrollContainer();
-  const path = location.pathname;
-  const previous = mode === 'resume' ? await savedProgress() : null;
-  // Resume where the last scan of this same view stopped; otherwise start at the top.
-  const resumeAt = previous && previous.path === path && !previous.finished ? previous.top : 0;
-  container.scrollTo({ top: resumeAt });
-  const startedWith = resumeAt > 0 ? (previous?.seen ?? 0) : 0;
-
+/**
+ * Runs one pass of the scanner from the current position. `bookmark` saves where it got to (for
+ * "Continue scan"); `base` is added to the counts so a two-part scan counts up smoothly.
+ */
+async function pass(
+  container: Element,
+  path: string,
+  opts: {
+    known?: ReadonlySet<string>;
+    bookmark: boolean;
+    base: number;
+    bookmarkBase: number;
+    /** More follows this pass, so its end isn't reported as the end of the scan. */
+    more?: boolean;
+  },
+) {
   const current = new Scanner(
     {
       readItems: () => readVisibleItems(),
       scrollStep: () => container.scrollBy({ top: container.clientHeight * 0.8 }),
       atEnd: () => container.scrollTop + container.clientHeight >= container.scrollHeight - 4,
       onStep: () => {
-        // "Check for new photos" doesn't move the bookmark of a full scan.
-        if (mode !== 'new') {
-          saveProgress({
-            path,
-            top: container.scrollTop,
-            finished: false,
-            seen: startedWith + (scanner?.seenCount ?? 0),
-            at: Date.now(),
-          });
-        }
+        if (!opts.bookmark) return;
+        saveProgress({
+          path,
+          top: container.scrollTop,
+          finished: false,
+          seen: opts.bookmarkBase + current.seenCount,
+          at: Date.now(),
+        });
       },
       sleep,
       onItems: (items) => {
         for (const i of items) found.set(i.id, i);
         send({ type: 'scan/items', items });
       },
-      onProgress: (seen, state) => send({ type: 'scan/progress', seen, state }),
+      onProgress: (seen, state) =>
+        send({
+          type: 'scan/progress',
+          seen: opts.base + seen,
+          state: opts.more && state === 'done' ? 'running' : state,
+        }),
     },
-    mode === 'new' ? { ...DEFAULT_SCAN_OPTIONS, known: new Set(knownIds) } : DEFAULT_SCAN_OPTIONS,
+    opts.known ? { ...DEFAULT_SCAN_OPTIONS, known: opts.known } : DEFAULT_SCAN_OPTIONS,
   );
   scanner = current;
-  current
-    .run()
-    .then((reason) => {
-      if (reason === 'end' && mode !== 'new') {
-        saveProgress({
-          path,
-          top: container.scrollTop,
-          finished: true,
-          seen: startedWith + current.seenCount,
-          at: Date.now(),
+  const reason = await current.run();
+  if (reason === 'end' && opts.bookmark) {
+    saveProgress({
+      path,
+      top: container.scrollTop,
+      finished: true,
+      seen: opts.bookmarkBase + current.seenCount,
+      at: Date.now(),
+    });
+  }
+  return { reason, seen: current.seenCount };
+}
+
+/** Waits for Google to draw the grid after a jump (it fills a new spot in about a second). */
+async function jumpTo(container: Element, top: number): Promise<void> {
+  // Right after a long jump the page still shows the old spot, so wait before reading.
+  const far = Math.abs(container.scrollTop - top) > container.clientHeight;
+  container.scrollTo({ top });
+  if (far) await sleep(1500);
+}
+
+let starting = false;
+/** Stop pressed between the two parts of an update scan (no scanner is running then). */
+let stopRequested = false;
+
+async function start(mode: ScanMode, knownIds: readonly string[]): Promise<void> {
+  if (starting || (scanner && (scanner.status === 'running' || scanner.status === 'paused'))) {
+    return;
+  }
+  starting = true;
+  stopRequested = false;
+  try {
+    const container = findScrollContainer();
+    const path = location.pathname;
+    const saved = await savedProgress();
+    // A full scan of this same view that stopped part-way.
+    const unfinished = saved && saved.path === path && !saved.finished ? saved : null;
+    const known = new Set(knownIds);
+
+    if (mode === 'new' || mode === 'update') {
+      // New photos are at the top: read until only photos scanned before are on screen. Without
+      // an earlier scan that's simply a full scan, so then it keeps the bookmark too.
+      const fresh = known.size === 0;
+      await jumpTo(container, 0);
+      const first = await pass(container, path, {
+        ...(fresh ? {} : { known }),
+        bookmark: fresh,
+        base: 0,
+        bookmarkBase: 0,
+        more: mode === 'update' && unfinished !== null && !fresh,
+      });
+      // "update": then jump straight to where the last full scan stopped and finish it.
+      if (mode === 'update' && first.reason === 'caught-up' && unfinished) {
+        await jumpTo(container, unfinished.top);
+        if (stopRequested) {
+          send({ type: 'scan/done', seen: first.seen, reason: 'cancelled' });
+          return;
+        }
+        const rest = await pass(container, path, {
+          bookmark: true,
+          base: first.seen,
+          bookmarkBase: unfinished.seen,
         });
+        send({ type: 'scan/done', seen: first.seen + rest.seen, reason: rest.reason });
+        return;
       }
-      send({ type: 'scan/done', seen: current.seenCount, reason });
-    })
-    .catch((err: unknown) => send({ type: 'scan/error', message: String(err) }));
+      send({ type: 'scan/done', seen: first.seen, reason: first.reason });
+      return;
+    }
+
+    // resume: from where the last scan of this view stopped; full: from the top.
+    const from = mode === 'resume' && unfinished ? unfinished : null;
+    await jumpTo(container, from?.top ?? 0);
+    const result = await pass(container, path, {
+      bookmark: true,
+      base: 0,
+      bookmarkBase: from?.seen ?? 0,
+    });
+    send({ type: 'scan/done', seen: result.seen, reason: result.reason });
+  } catch (err) {
+    send({ type: 'scan/error', message: String(err) });
+  } finally {
+    starting = false;
+  }
 }
 
 function status(): PanelResponse {
@@ -205,6 +283,7 @@ if (!alreadyLoaded)
         scanner?.resume();
         break;
       case 'scan/cancel':
+        stopRequested = true;
         scanner?.cancel();
         break;
     }
