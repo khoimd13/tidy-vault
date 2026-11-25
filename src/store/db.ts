@@ -28,13 +28,31 @@ export interface StoredSize {
   spaceTaken: number | null;
 }
 
-const DB_NAME = 'vault-tidy';
+/** The database used before results were kept per Google account. */
+export const DEFAULT_DB_NAME = 'vault-tidy';
 const DB_VERSION = 4;
 
+let dbName = DEFAULT_DB_NAME;
 let dbPromise: Promise<IDBPDatabase<VaultSchema>> | null = null;
 
+/**
+ * Switches to another database (one per Google account). Later calls read and write there; the
+ * previous one is closed.
+ */
+export function selectDatabase(name: string): void {
+  if (name === dbName) return;
+  const previous = dbPromise;
+  dbPromise = null;
+  dbName = name;
+  void previous?.then((d) => d.close()).catch(() => undefined);
+}
+
+export function currentDatabase(): string {
+  return dbName;
+}
+
 function db(): Promise<IDBPDatabase<VaultSchema>> {
-  dbPromise ??= openDB<VaultSchema>(DB_NAME, DB_VERSION, {
+  dbPromise ??= openDB<VaultSchema>(dbName, DB_VERSION, {
     upgrade(database, oldVersion) {
       if (oldVersion < 1) {
         database.createObjectStore('items', { keyPath: 'id' });

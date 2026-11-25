@@ -20,7 +20,19 @@ export interface ScanProgress {
   at: number;
 }
 
+/** Where the scan bookmark was kept before results were kept per Google account. */
 export const SCAN_PROGRESS_KEY = 'scanProgress';
+
+/** Where a Google account's scan bookmark is kept (each account scans its own library). */
+export function scanProgressKey(accountId: string | null): string {
+  return accountId ? `${SCAN_PROGRESS_KEY}:${accountId}` : SCAN_PROGRESS_KEY;
+}
+
+/** The Google account signed in to the Google Photos tab. */
+export interface PageAccount {
+  id: string;
+  email: string | null;
+}
 
 /** Messages the side panel sends to the content script in the Google Photos tab. */
 export type PanelToContent =
@@ -50,6 +62,8 @@ export interface PanelResponse {
   seen: number;
   /** Only on `ping`: everything found on the page so far, so a reopened panel can catch up. */
   items?: PhotoItem[];
+  /** Only on `ping`: who is signed in to the page (null when it can't be read). */
+  account?: PageAccount | null;
   /** Only on `thumbs/fetch`: a data: URL per requested URL, or null when it failed. */
   thumbs?: (string | null)[];
   /** Only on `video/fetch`: the video as a data: URL, or why there is none. */

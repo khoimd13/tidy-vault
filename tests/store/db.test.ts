@@ -64,3 +64,16 @@ describe('thumbnail store', () => {
     expect(await store.getThumb('a')).toBeNull();
   });
 });
+
+describe('one database per account', () => {
+  it('keeps each database apart and comes back to the first', async () => {
+    store.selectDatabase(store.DEFAULT_DB_NAME);
+    await store.clearAll();
+    await store.putItems([photo('mine')]);
+    store.selectDatabase('vault-tidy:other');
+    expect(await store.getAllItems()).toEqual([]);
+    await store.putItems([photo('theirs')]);
+    store.selectDatabase(store.DEFAULT_DB_NAME);
+    expect((await store.getAllItems()).map((i) => i.id)).toEqual(['mine']);
+  });
+});

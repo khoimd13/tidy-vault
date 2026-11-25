@@ -5,6 +5,7 @@ import {
   fetchSizes,
   parseSizes,
   parseReply,
+  readAccount,
   readSession,
   type Session,
 } from '../../src/source/googlePhotosApi';
@@ -23,6 +24,20 @@ describe('readSession', () => {
   });
   it('fails clearly when Google changes the page', () => {
     expect(() => readSession(['nothing here'])).toThrow(/SNlM0e/);
+  });
+});
+
+describe('readAccount', () => {
+  it('reads the signed-in account id and email', () => {
+    const html = `window.WIZ_global_data = {"S06Grb":"104729383650123456789","oPEP7c":"me\u0040example.com","x":1};`;
+    expect(readAccount([html])).toEqual({ id: '104729383650123456789', email: 'me@example.com' });
+  });
+  it('works without an email', () => {
+    expect(readAccount(['WIZ_global_data = {"S06Grb":"42"}'])).toEqual({ id: '42', email: null });
+  });
+  it('gives null when the page has no account', () => {
+    expect(readAccount(['nothing here'])).toBeNull();
+    expect(readAccount(['WIZ_global_data = {"S06Grb":"not-a-number"}'])).toBeNull();
   });
 });
 

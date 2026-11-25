@@ -25,7 +25,9 @@ Only on your computer, in the extension's own storage:
 - the scanned items listed above, small thumbnails (about 10 KB each) and file sizes;
 - numbers the on-device AI computes for each photo (used to recognise and group photos);
 - your choices (keep, add to the cleanup list) and how far a scan got;
-- your settings, such as language and the optional monthly reminder.
+- your settings, such as language and the optional monthly reminder;
+- which Google account the results belong to (Google's account number and your email, shown
+  in the panel), so each account's results are kept apart.
 
 **Clear local data** in the extension deletes all of it. Uninstalling the extension deletes it
 too. Videos you play are streamed into the panel and are not saved.
@@ -94,7 +96,9 @@ Chỉ trên máy tính của bạn, trong bộ nhớ riêng của extension:
 - các mục đã quét nói ở trên, ảnh thu nhỏ (khoảng 10 KB mỗi ảnh) và dung lượng;
 - các con số mà AI trên máy tính ra cho từng ảnh (để nhận diện và gom nhóm ảnh);
 - lựa chọn của bạn (giữ lại, thêm vào danh sách dọn) và lần quét đã đến đâu;
-- cài đặt của bạn, như ngôn ngữ và lời nhắc hằng tháng (không bắt buộc).
+- cài đặt của bạn, như ngôn ngữ và lời nhắc hằng tháng (không bắt buộc);
+- kết quả thuộc tài khoản Google nào (mã tài khoản của Google và email, hiện trong khung), để
+  kết quả của mỗi tài khoản được giữ riêng.
 
 Nút **Xoá dữ liệu cục bộ** trong extension xoá toàn bộ dữ liệu này. Gỡ extension cũng xoá hết.
 Video bạn phát chỉ được truyền vào khung xem, không được lưu lại.

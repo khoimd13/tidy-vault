@@ -35,6 +35,32 @@ export function readSession(scriptTexts: readonly string[]): Session {
   return { at: pick('SNlM0e'), sid: pick('FdrFJe'), bl: pick('cfb2h'), path: pick('eptZe') };
 }
 
+/** The Google account signed in to the page, so each account's results are kept apart. */
+export interface Account {
+  /** Google's numeric account id (WIZ_global_data.S06Grb). */
+  id: string;
+  /** The account's email (oPEP7c), shown in the panel; null when the page doesn't say. */
+  email: string | null;
+}
+
+/** Reads the signed-in account from the page's HTML; null when it can't be found. */
+export function readAccount(scriptTexts: readonly string[]): Account | null {
+  const text = scriptTexts.find((t) => t.includes('WIZ_global_data')) ?? '';
+  const pick = (key: string): string | null => {
+    const m = new RegExp(`"${key}":"((?:[^"\\\\]|\\\\.)*)"`).exec(text);
+    if (!m?.[1]) return null;
+    try {
+      return JSON.parse(`"${m[1]}"`) as string;
+    } catch {
+      return null;
+    }
+  };
+  const id = pick('S06Grb');
+  if (!id || !/^\d+$/.test(id)) return null;
+  const email = pick('oPEP7c');
+  return { id, email: email?.includes('@') ? email : null };
+}
+
 export function buildRequest(
   session: Session,
   rpcid: string,

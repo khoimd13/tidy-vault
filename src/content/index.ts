@@ -8,10 +8,15 @@ import {
   findVideoStream,
 } from '../source/googlePhotosDom';
 import { DEFAULT_SCAN_OPTIONS, Scanner } from '../scan/scanner';
-import { addPhotosToNewAlbum, fetchSizes, readSession } from '../source/googlePhotosApi';
 import {
-  SCAN_PROGRESS_KEY,
+  addPhotosToNewAlbum,
+  fetchSizes,
+  readAccount,
+  readSession,
+} from '../source/googlePhotosApi';
+import {
   isPanelToContent,
+  scanProgressKey,
   type ContentToPanel,
   type PanelResponse,
   type ScanMode,
@@ -47,13 +52,27 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+const pageScripts = () => Array.from(document.scripts, (s) => s.textContent ?? '');
+
+/**
+ * Who is signed in to this page; each Google account keeps its own scan bookmark. Switching
+ * account loads a new page (and a new copy of this script), so it is read once.
+ */
+let pageAccount: ReturnType<typeof readAccount> | undefined;
+const account = () => {
+  pageAccount ??= readAccount(pageScripts()) ?? undefined;
+  return pageAccount ?? null;
+};
+const progressKey = () => scanProgressKey(account()?.id ?? null);
+
 function saveProgress(progress: ScanProgress): void {
-  void chrome.storage.local.set({ [SCAN_PROGRESS_KEY]: progress }).catch(() => undefined);
+  void chrome.storage.local.set({ [progressKey()]: progress }).catch(() => undefined);
 }
 
 async function savedProgress(): Promise<ScanProgress | null> {
-  const stored: Record<string, unknown> = await chrome.storage.local.get(SCAN_PROGRESS_KEY);
-  const p = stored[SCAN_PROGRESS_KEY] as ScanProgress | undefined;
+  const key = progressKey();
+  const stored: Record<string, unknown> = await chrome.storage.local.get(key);
+  const p = stored[key] as ScanProgress | undefined;
   return p && typeof p.top === 'number' ? p : null;
 }
 
@@ -197,7 +216,7 @@ if (!alreadyLoaded)
   chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
     if (!isPanelToContent(msg)) return;
     if (msg.type === 'sizes/fetch') {
-      const scripts = Array.from(document.scripts, (s) => s.textContent ?? '');
+      const scripts = pageScripts();
       void (async () => {
         try {
           const sizes = await fetchSizes(msg.mediaKeys, {
@@ -233,7 +252,7 @@ if (!alreadyLoaded)
       return true;
     }
     if (msg.type === 'album/add') {
-      const scripts = Array.from(document.scripts, (s) => s.textContent ?? '');
+      const scripts = pageScripts();
       void (async () => {
         try {
           const result = await addPhotosToNewAlbum(msg.name, msg.mediaKeys, {
@@ -302,5 +321,8 @@ if (!alreadyLoaded)
         scanner?.cancel();
         break;
     }
-    sendResponse({ ...status(), ...(msg.type === 'ping' ? { items: [...found.values()] } : {}) });
+    sendResponse({
+      ...status(),
+      ...(msg.type === 'ping' ? { items: [...found.values()], account: account() } : {}),
+    });
   });

@@ -225,6 +225,7 @@ async function respond(msg: PanelToContent) {
       video: dataUrl ? { ok: true, dataUrl } : { ok: false, reason: 'unavailable' },
     };
   }
+  if (msg.type === 'ping') return { ...base, account: pageAccount };
   if (msg.type === 'thumbs/fetch') return { ...base, thumbs: await fetchAsDataUrls(msg.urls) };
   if (msg.type === 'sizes/fetch') {
     // Pretend Google knows the size of every other photo (to show partly-exact totals).
@@ -246,6 +247,12 @@ async function respond(msg: PanelToContent) {
 const params = new URLSearchParams(location.search);
 const onPhotos = params.get('photos') !== 'no';
 if (params.get('welcome') === 'no') storage.set('welcomed', true);
+// ?switched: the panel last showed another account, so it switches on the first ping.
+const pageAccount = { id: '2', email: 'you@example.com' };
+if (params.has('switched')) {
+  storage.set('accounts', { '1': { db: 'vault-tidy', email: 'old@example.com' } });
+  storage.set('lastAccount', { id: '1', email: 'old@example.com' });
+}
 
 const noop = () => undefined;
 const event = { addListener: noop, removeListener: noop };
@@ -273,6 +280,10 @@ const event = { addListener: noop, removeListener: noop };
       get: (key: string) => Promise.resolve({ [key]: storage.get(key) }),
       set: (obj: Record<string, unknown>) => {
         for (const [k, v] of Object.entries(obj)) storage.set(k, v);
+        return Promise.resolve();
+      },
+      remove: (key: string) => {
+        storage.delete(key);
         return Promise.resolve();
       },
     },

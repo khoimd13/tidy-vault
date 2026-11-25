@@ -6,8 +6,9 @@ import { findNearDuplicates } from '../../ml/duplicates';
 import { buildFeedback, withFeedback } from '../../ml/feedback';
 import { isEmptyImage } from '../../ml/quality';
 import {
-  SCAN_PROGRESS_KEY,
   isContentToPanel,
+  scanProgressKey,
+  type PageAccount,
   type PanelToContent,
   type ScanMode,
   type ScanProgress,
@@ -52,7 +53,13 @@ function mergeItems(prev: PhotoItem[], next: PhotoItem[]): PhotoItem[] {
   return [...byId.values()];
 }
 
-export function useVault() {
+/**
+ * `account` is the Google account whose results are shown (null before any is known). When the
+ * Google Photos tab turns out to be signed in to another account, `onAccount` is called instead
+ * of mixing that account's photos in; the panel then starts over on that account's results.
+ */
+export function useVault(account: PageAccount | null, onAccount: (account: PageAccount) => void) {
+  const accountId = account?.id ?? null;
   const [tabId, setTabId] = useState<number | null>(null);
   const tabIdRef = useRef<number | null>(null);
   tabIdRef.current = tabId;
@@ -148,6 +155,10 @@ export function useVault() {
           await injectContentScript(tabId);
           res = await send();
         }
+        if (type === 'ping' && res.account && res.account.id !== accountId) {
+          onAccount(res.account);
+          return;
+        }
         setScan({ state: res.state, seen: res.seen });
         if (res.items) addItems(res.items);
         if (type === 'ping') setConnection((n) => n + 1);
@@ -160,7 +171,7 @@ export function useVault() {
         });
       }
     },
-    [tabId, addItems],
+    [tabId, addItems, accountId, onAccount],
   );
 
   /** How the last scan ended, e.g. 'caught-up' after "Check for new photos" found nothing new. */
@@ -169,17 +180,18 @@ export function useVault() {
   /** Where the last full scan got to, for "Continue scan" (shared with the page script). */
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   useEffect(() => {
+    const key = scanProgressKey(accountId);
     const load = () =>
-      void chrome.storage.local.get(SCAN_PROGRESS_KEY).then((s: Record<string, unknown>) => {
-        setProgress((s[SCAN_PROGRESS_KEY] as ScanProgress | undefined) ?? null);
+      void chrome.storage.local.get(key).then((s: Record<string, unknown>) => {
+        setProgress((s[key] as ScanProgress | undefined) ?? null);
       });
     load();
     const onChanged = (changes: Record<string, unknown>) => {
-      if (SCAN_PROGRESS_KEY in changes) load();
+      if (key in changes) load();
     };
     chrome.storage.onChanged?.addListener(onChanged);
     return () => chrome.storage.onChanged?.removeListener(onChanged);
-  }, []);
+  }, [accountId]);
 
   const startScan = useCallback(
     (mode: ScanMode) => {
@@ -413,6 +425,7 @@ export function useVault() {
 
   return {
     onPhotos: tabId !== null,
+    account,
     scan,
     scanProgress: progress,
     lastScanEnd: lastEnd,

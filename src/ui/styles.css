@@ -1176,3 +1176,12 @@ button.soft:hover:not(:disabled) {
 .size-note {
   font-size: 11px;
 }
+
+/* The Google account whose results are shown (each account keeps its own). */
+.account {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

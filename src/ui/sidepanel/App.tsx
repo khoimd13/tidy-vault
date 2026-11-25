@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
+import type { PageAccount } from '../../shared/messages';
+import { lastAccount, openAccount } from '../lib/accounts';
 import { getFlag, setFlag } from '../lib/chromeApi';
-import { Toast, useToast } from './components/Toast';
+import { clearThumbCache } from './components/Thumb';
+import { Toast, useToast, type ToastApi } from './components/Toast';
 import { Cleanup } from './screens/Cleanup';
 import { Home } from './screens/Home';
 import { Review } from './screens/Review';
@@ -16,9 +19,63 @@ type Screen =
 
 const WELCOMED = 'welcomed';
 
+/**
+ * Each Google account has its own results. The panel opens on the account it showed last and
+ * starts over (fresh state, that account's saved results) when the Google Photos tab turns out
+ * to be signed in to another one.
+ */
 export function App() {
-  const vault = useVault();
   const toast = useToast();
+  /** null while loading; `switched` once the panel moved to another account's results. */
+  const [account, setAccount] = useState<{ value: PageAccount | null; switched: boolean } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    void (async () => {
+      const last = await lastAccount();
+      if (last) await openAccount(last);
+      setAccount({ value: last, switched: false });
+    })();
+  }, []);
+
+  const onAccount = useCallback(
+    (next: PageAccount) => {
+      void (async () => {
+        const hadOne = Boolean(account?.value);
+        await openAccount(next);
+        clearThumbCache();
+        toast.hide(); // its Undo belongs to the other account
+        setAccount({ value: next, switched: hadOne });
+      })();
+    },
+    [account, toast],
+  );
+
+  if (!account) return null;
+  return (
+    <VaultApp
+      key={account.value?.id ?? 'none'}
+      account={account.value}
+      switched={account.switched}
+      onAccount={onAccount}
+      toast={toast}
+    />
+  );
+}
+
+function VaultApp({
+  account,
+  switched,
+  onAccount,
+  toast,
+}: {
+  account: PageAccount | null;
+  switched: boolean;
+  onAccount: (account: PageAccount) => void;
+  toast: ToastApi;
+}) {
+  const vault = useVault(account, onAccount);
   const [screen, setScreen] = useState<Screen>({ name: 'loading' });
   const home = () => setScreen({ name: 'home' });
 
@@ -52,6 +109,7 @@ export function App() {
       content = (
         <Home
           vault={vault}
+          switched={switched}
           onReview={(categoryId) => setScreen({ name: 'review', categoryId })}
           onCleanup={() => setScreen({ name: 'cleanup' })}
         />
